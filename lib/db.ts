@@ -291,14 +291,18 @@ export async function getAttendance(): Promise<Attendance[]> {
 }
 
 // Save attendance record
-export async function saveAttendance(record: Omit<Attendance, 'id' | 'timestamp'>): Promise<Attendance | null> {
+export async function saveAttendance(
+  record: Omit<Attendance, 'id' | 'timestamp'> & { timestamp?: string }
+): Promise<Attendance | null> {
+  const finalTimestamp = record.timestamp || new Date().toISOString();
+  
   // 1. Try Google Sheets Web App if active
   if (isGoogleSheetsActive()) {
     try {
       const newRecord: Attendance = {
         ...record,
         id: globalThis.crypto?.randomUUID() || Math.random().toString(36).substring(2, 11),
-        timestamp: new Date().toISOString()
+        timestamp: finalTimestamp
       };
       const res = await callGoogleScript('addAttendance', { record: newRecord });
       if (res && res.success) {
@@ -320,7 +324,7 @@ export async function saveAttendance(record: Omit<Attendance, 'id' | 'timestamp'
     const newRecord: Attendance = {
       ...record,
       id: globalThis.crypto?.randomUUID() || Math.random().toString(36).substring(2, 11),
-      timestamp: new Date().toISOString()
+      timestamp: finalTimestamp
     };
 
     attendance.push(newRecord);

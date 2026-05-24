@@ -16,7 +16,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { studentId, confidence, status, classroom } = body;
+    const { studentId, confidence, status, classroom, timestamp } = body;
 
     if (!studentId || confidence === undefined) {
       return NextResponse.json(
@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
       confidence: parseFloat(confidence),
       classroom: recordClassroom,
       status: recordStatus as 'present' | 'late' | 'absent' | 'leave',
+      timestamp: timestamp,
     });
 
     if (!newRecord) {
