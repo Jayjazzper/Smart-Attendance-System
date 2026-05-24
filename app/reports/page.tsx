@@ -12,7 +12,7 @@ import {
   parseISO, 
   isSameDay 
 } from "date-fns";
-import { Student, Attendance } from "@/lib/types";
+import { Student, Attendance, LeaveRequest } from "@/lib/types";
 
 interface StudentReportStats {
   student: Student;
@@ -28,6 +28,9 @@ interface StudentReportStats {
 export default function ReportsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [leaves, setLeaves] = useState<LeaveRequest[]>([]);
+  const [activeTab, setActiveTab] = useState<"attendance" | "leaves">("attendance");
+  const [leavesUpdating, setLeavesUpdating] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   
@@ -50,19 +53,22 @@ export default function ReportsPage() {
   const [isAutoAbsentLoading, setIsAutoAbsentLoading] = useState(false);
   const [toastMessage, setToastMessage] = useState({ text: "", type: "" });
 
-  // 1. Fetch Students and Attendance records
+  // 1. Fetch Students, Attendance, and Leave records
   const fetchData = async () => {
     try {
-      const [studentsRes, attendanceRes] = await Promise.all([
+      const [studentsRes, attendanceRes, leavesRes] = await Promise.all([
         fetch("/api/students"),
-        fetch("/api/attendance")
+        fetch("/api/attendance"),
+        fetch("/api/leaves")
       ]);
       
-      if (studentsRes.ok && attendanceRes.ok) {
+      if (studentsRes.ok && attendanceRes.ok && leavesRes.ok) {
         const studentsData = await studentsRes.json();
         const attendanceData = await attendanceRes.json();
+        const leavesData = await leavesRes.json();
         setStudents(studentsData.students || []);
         setAttendance(attendanceData.attendance || []);
+        setLeaves(leavesData.leaves || []);
       }
     } catch (err) {
       console.error("Error loading reports data:", err);
@@ -358,6 +364,52 @@ export default function ReportsPage() {
     document.body.removeChild(link);
   };
 
+  // 8. Handle Leave Request Status Change (Approve/Reject)
+  const handleLeaveStatusChange = async (id: string, status: "approved" | "rejected") => {
+    setLeavesUpdating(true);
+    setToastMessage({ text: "", type: "" });
+    try {
+      const res = await fetch(`/api/leaves/${id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        setToastMessage({ 
+          text: `✓ ${status === "approved" ? "อนุมัติ" : "ปฏิเสธ"}คำขอลาสำเร็จและซิงค์เข้าระบบเช็คชื่อเรียบร้อยแล้ว`, 
+          type: "success" 
+        });
+        await fetchData(); // refresh stats and leaves list
+        setTimeout(() => setToastMessage({ text: "", type: "" }), 4000);
+      } else {
+        const data = await res.json();
+        setToastMessage({ text: data.error || "เกิดข้อผิดพลาดในการบันทึกสถานะใบลา", type: "error" });
+      }
+    } catch (e) {
+      console.error(e);
+      setToastMessage({ text: "ไม่สามารถส่งการทำรายการไปยังเซิร์ฟเวอร์ได้", type: "error" });
+    } finally {
+      setLeavesUpdating(false);
+    }
+  };
+
+  // 9. Filter leaves list
+  const filteredLeaves = leaves.filter(l => {
+    const matchesSearch = 
+      l.studentId.includes(searchTerm) || 
+      l.studentName.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // Check classroom setting
+    const matchesClass = selectedClassroom === "all" || l.classroom === selectedClassroom;
+
+    // Check level setting
+    // We map student to get their level
+    const student = students.find(s => s.id === l.studentId);
+    const matchesLevel = selectedLevel === "all" || (student && student.level === selectedLevel);
+
+    return matchesSearch && matchesClass && matchesLevel;
+  });
+
   return (
     <div className="flex flex-col gap-6 py-6 animate-fade-in relative">
       {/* Title */}
@@ -517,6 +569,36 @@ export default function ReportsPage() {
         )}
       </div>
 
+      {/* Tabs Selector */}
+      <div className="flex border-b border-slate-200">
+        <button
+          onClick={() => setActiveTab("attendance")}
+          className={`px-5 py-3 text-xs font-black border-b-2 transition-all cursor-pointer ${
+            activeTab === "attendance"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          ตารางประวัติเช็คชื่อ
+        </button>
+        <button
+          onClick={() => setActiveTab("leaves")}
+          className={`px-5 py-3 text-xs font-black border-b-2 transition-all cursor-pointer relative ${
+            activeTab === "leaves"
+              ? "border-blue-600 text-blue-600"
+              : "border-transparent text-slate-500 hover:text-slate-700"
+          }`}
+        >
+          จัดการคำร้องขอลาเรียน
+          {leaves.filter(l => l.status === "pending").length > 0 && (
+            <span className="absolute top-2.5 right-1.5 flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+            </span>
+          )}
+        </button>
+      </div>
+
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-2">
           <svg className="animate-spin h-6 w-6 text-blue-500" fill="none" viewBox="0 0 24 24">
@@ -525,7 +607,7 @@ export default function ReportsPage() {
           </svg>
           <span className="text-xs font-bold">กำลังประมวลผลข้อมูลสถิติ...</span>
         </div>
-      ) : (
+      ) : activeTab === "attendance" ? (
         <>
           {/* Summary stats row */}
           <div className="grid gap-4 grid-cols-2 lg:grid-cols-5 mt-1">
@@ -659,6 +741,109 @@ export default function ReportsPage() {
             </div>
           </div>
         </>
+      ) : (
+        /* Render Leaves Management UI */
+        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm flex flex-col gap-4 mt-1">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">รายการคำร้องขอลาเรียนจากผู้ปกครอง</h3>
+            <p className="text-[10px] font-semibold text-slate-500 mt-0.5">
+              ตรวจสอบเหตุผลการลา อนุมัติ หรือ ปฏิเสธ คำร้องใบลาเรียนของนักเรียนยื่นออนไลน์
+            </p>
+          </div>
+
+          <div className="overflow-x-auto -mx-6 mt-2">
+            <div className="inline-block min-w-full align-middle px-6">
+              <table className="min-w-full divide-y divide-slate-100">
+                <thead>
+                  <tr className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="py-3 px-2 w-[110px]">รหัสประจำตัว</th>
+                    <th className="py-3 px-2 w-[180px]">ชื่อ-นามสกุล</th>
+                    <th className="py-3 px-2 w-[80px]">ห้องเรียน</th>
+                    <th className="py-3 px-2 w-[90px]">ประเภทการลา</th>
+                    <th className="py-3 px-2 w-[180px]">วันที่ลา</th>
+                    <th className="py-3 px-2">เหตุผลการลา</th>
+                    <th className="py-3 px-2 w-[100px] text-center">สถานะ</th>
+                    <th className="py-3 px-2 w-[150px] text-center">การดำเนินการ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs font-semibold text-slate-700">
+                  {filteredLeaves.length > 0 ? (
+                    filteredLeaves.map((leave) => {
+                      const isPending = leave.status === "pending";
+                      const isApproved = leave.status === "approved";
+                      const isRejected = leave.status === "rejected";
+
+                      const typeLabel = leave.type === "sick" ? "ลาป่วย" : leave.type === "personal" ? "ลากิจ" : "ลาอื่น ๆ";
+                      const typeColor = leave.type === "sick" ? "bg-red-50 text-red-600 border-red-100" : leave.type === "personal" ? "bg-amber-50 text-amber-600 border-amber-100" : "bg-slate-50 text-slate-600 border-slate-100";
+
+                      return (
+                        <tr key={leave.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="py-3 px-2 text-slate-900 font-bold">{leave.studentId}</td>
+                          <td className="py-3 px-2 text-slate-900 font-bold">{leave.studentName}</td>
+                          <td className="py-3 px-2">
+                            <span className="rounded bg-blue-50 border border-blue-100 px-1.5 py-0.5 text-[9px] font-bold text-blue-600">
+                              {leave.classroom || "-"}
+                            </span>
+                          </td>
+                          <td className="py-3 px-2">
+                            <span className={`rounded border px-1.5 py-0.5 text-[9px] font-extrabold ${typeColor}`}>
+                              {typeLabel}
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 whitespace-nowrap">
+                            {format(new Date(leave.startDate), "dd/MM/yyyy")} - {format(new Date(leave.endDate), "dd/MM/yyyy")}
+                          </td>
+                          <td className="py-3 px-2 text-slate-600 max-w-[250px] truncate" title={leave.reason}>
+                            {leave.reason}
+                          </td>
+                          <td className="py-3 px-2 text-center">
+                            <span className={`rounded-lg px-2.5 py-0.5 font-bold ${
+                              isApproved
+                                ? "bg-emerald-50 text-emerald-600"
+                                : isRejected
+                                ? "bg-red-50 text-red-600"
+                                : "bg-amber-50 text-amber-600"
+                            }`}>
+                              {isApproved ? "อนุมัติแล้ว" : isRejected ? "ปฏิเสธ" : "รออนุมัติ"}
+                            </span>
+                          </td>
+                          <td className="py-3 px-2 text-center">
+                            {isPending ? (
+                              <div className="flex items-center justify-center gap-1.5">
+                                <button
+                                  onClick={() => handleLeaveStatusChange(leave.id, "approved")}
+                                  disabled={leavesUpdating}
+                                  className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[10px] font-black text-white hover:bg-emerald-700 disabled:bg-slate-300 transition-colors cursor-pointer"
+                                >
+                                  อนุมัติ
+                                </button>
+                                <button
+                                  onClick={() => handleLeaveStatusChange(leave.id, "rejected")}
+                                  disabled={leavesUpdating}
+                                  className="rounded-lg bg-red-500 px-2.5 py-1 text-[10px] font-black text-white hover:bg-red-600 disabled:bg-slate-300 transition-colors cursor-pointer"
+                                >
+                                  ปฏิเสธ
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-[10px] font-medium">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                        ไม่พบคำร้องขอลาเรียนตามเงื่อนไขที่เลือก
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Manual Entry Modal Overlay */}

@@ -27,3 +27,16 @@ export interface DatabaseState {
 export interface AttendanceState {
   attendance: Attendance[];
 }
+
+export interface LeaveRequest {
+  id: string;
+  studentId: string;
+  studentName: string;
+  classroom: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  type: 'sick' | 'personal' | 'other'; // ลาป่วย, ลากิจ, อื่นๆ
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  submittedAt: string; // ISO format string
+}

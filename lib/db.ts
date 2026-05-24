@@ -1,11 +1,12 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { Student, Attendance } from './types';
+import { Student, Attendance, LeaveRequest } from './types';
 
 // Paths to JSON files
 const DATA_DIR = path.join(process.cwd(), 'data');
 const STUDENTS_FILE = path.join(DATA_DIR, 'students.json');
 const ATTENDANCE_FILE = path.join(DATA_DIR, 'attendance.json');
+const LEAVES_FILE = path.join(DATA_DIR, 'leaves.json');
 
 // Google Apps Script URL from environment variables
 const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL;
@@ -57,6 +58,12 @@ async function ensureDbExists() {
     await fs.access(ATTENDANCE_FILE);
   } catch {
     await fs.writeFile(ATTENDANCE_FILE, JSON.stringify({ attendance: [] }, null, 2));
+  }
+
+  try {
+    await fs.access(LEAVES_FILE);
+  } catch {
+    await fs.writeFile(LEAVES_FILE, JSON.stringify({ leaves: [] }, null, 2));
   }
 }
 
@@ -403,6 +410,111 @@ export async function saveSettings(settings: SystemSettings): Promise<boolean> {
     return true;
   } catch (error) {
     console.error('Error saving settings:', error);
+    return false;
+  } finally {
+    release();
+  }
+}
+
+// Get all leave requests
+export async function getLeaveRequests(): Promise<LeaveRequest[]> {
+  const release = await dbMutex.acquire();
+  try {
+    await ensureDbExists();
+    const data = await fs.readFile(LEAVES_FILE, 'utf-8');
+    const parsed = JSON.parse(data);
+    return parsed.leaves || [];
+  } catch (error) {
+    console.error('Error reading local leaves:', error);
+    return [];
+  } finally {
+    release();
+  }
+}
+
+// Save leave request (Submit)
+export async function saveLeaveRequest(request: LeaveRequest): Promise<boolean> {
+  const release = await dbMutex.acquire();
+  try {
+    await ensureDbExists();
+    const data = await fs.readFile(LEAVES_FILE, 'utf-8');
+    const parsed = JSON.parse(data);
+    const leaves: LeaveRequest[] = parsed.leaves || [];
+    leaves.push(request);
+    await fs.writeFile(LEAVES_FILE, JSON.stringify({ leaves }, null, 2));
+    return true;
+  } catch (error) {
+    console.error('Error saving local leave request:', error);
+    return false;
+  } finally {
+    release();
+  }
+}
+
+// Update leave request status (Approve/Reject)
+export async function updateLeaveRequestStatus(
+  id: string,
+  status: 'approved' | 'rejected'
+): Promise<boolean> {
+  const release = await dbMutex.acquire();
+  try {
+    await ensureDbExists();
+    const data = await fs.readFile(LEAVES_FILE, 'utf-8');
+    const parsed = JSON.parse(data);
+    const leaves: LeaveRequest[] = parsed.leaves || [];
+
+    const index = leaves.findIndex((l) => l.id === id);
+    if (index === -1) return false;
+
+    leaves[index].status = status;
+    await fs.writeFile(LEAVES_FILE, JSON.stringify({ leaves }, null, 2));
+
+    // If approved, append attendance logs of status 'leave' for each date in range
+    if (status === 'approved') {
+      const req = leaves[index];
+      try {
+        const start = new Date(req.startDate);
+        const end = new Date(req.endDate);
+
+        // Load existing attendance
+        const attData = await fs.readFile(ATTENDANCE_FILE, 'utf-8');
+        const attParsed = JSON.parse(attData);
+        const attendance: Attendance[] = attParsed.attendance || [];
+
+        let current = new Date(start);
+        while (current <= end) {
+          // Create custom timestamp for this specific date, matching mid-day (08:30) in local timezone
+          const logTimestamp = new Date(
+            current.getFullYear(),
+            current.getMonth(),
+            current.getDate(),
+            8, 30, 0
+          ).toISOString();
+
+          const newRecord: Attendance = {
+            id: globalThis.crypto?.randomUUID() || Math.random().toString(36).substring(2, 11),
+            studentId: req.studentId,
+            studentName: req.studentName,
+            studentEmail: "",
+            confidence: 100,
+            timestamp: logTimestamp,
+            classroom: req.classroom,
+            status: 'leave'
+          };
+
+          attendance.push(newRecord);
+          current.setDate(current.getDate() + 1);
+        }
+
+        await fs.writeFile(ATTENDANCE_FILE, JSON.stringify({ attendance }, null, 2));
+      } catch (e) {
+        console.error('Error generating attendance logs for leave request:', e);
+      }
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error updating leave status:', error);
     return false;
   } finally {
     release();
