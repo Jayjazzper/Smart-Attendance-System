@@ -1,6 +1,5 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { crypto } from 'next/dist/compiled/@edge-runtime/primitives'; // or standard crypto
 import { Student, Attendance } from './types';
 
 // Paths to JSON files
@@ -8,7 +7,41 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const STUDENTS_FILE = path.join(DATA_DIR, 'students.json');
 const ATTENDANCE_FILE = path.join(DATA_DIR, 'attendance.json');
 
-// Helper to ensure files and directory exist
+// Google Apps Script URL from environment variables
+const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL;
+
+// Helper to check if Google Script URL is defined
+export function isGoogleSheetsActive(): boolean {
+  return !!GOOGLE_SCRIPT_URL;
+}
+
+// Call Google Apps Script Web App
+async function callGoogleScript(action: string, extraData: any = {}): Promise<any> {
+  if (!GOOGLE_SCRIPT_URL) return null;
+  try {
+    const response = await fetch(GOOGLE_SCRIPT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action, ...extraData }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success) {
+        return data;
+      }
+      throw new Error(data.error || 'Request to Google Apps Script failed');
+    }
+    throw new Error(`HTTP Error: ${response.status}`);
+  } catch (err) {
+    console.error(`Error calling Google Apps Script (${action}):`, err);
+    throw err;
+  }
+}
+
+// Helper to ensure local files and directory exist
 async function ensureDbExists() {
   try {
     await fs.mkdir(DATA_DIR, { recursive: true });
@@ -27,7 +60,7 @@ async function ensureDbExists() {
   }
 }
 
-// Simple Promise-based Mutex Lock for concurrency protection
+// Simple Promise-based Mutex Lock for local concurrency protection
 class Mutex {
   private promise: Promise<void> = Promise.resolve();
 
@@ -49,6 +82,19 @@ const dbMutex = new Mutex();
 
 // Get all students
 export async function getStudents(): Promise<Student[]> {
+  // 1. Try Google Sheets Web App if active
+  if (isGoogleSheetsActive()) {
+    try {
+      const res = await callGoogleScript('getStudents');
+      if (res && res.success) {
+        return res.students || [];
+      }
+    } catch (e) {
+      console.warn('Fallback to local JSON storage for getStudents due to API error:', e);
+    }
+  }
+
+  // 2. Fallback to local files
   const release = await dbMutex.acquire();
   try {
     await ensureDbExists();
@@ -56,7 +102,7 @@ export async function getStudents(): Promise<Student[]> {
     const parsed = JSON.parse(data);
     return parsed.students || [];
   } catch (error) {
-    console.error('Error reading students:', error);
+    console.error('Error reading local students:', error);
     return [];
   } finally {
     release();
@@ -65,6 +111,19 @@ export async function getStudents(): Promise<Student[]> {
 
 // Save a student (Register)
 export async function saveStudent(student: Student): Promise<boolean> {
+  // 1. Try Google Sheets Web App if active
+  if (isGoogleSheetsActive()) {
+    try {
+      const res = await callGoogleScript('addStudent', { student });
+      if (res) {
+        return !!res.success;
+      }
+    } catch (e) {
+      console.warn('Fallback to local JSON storage for saveStudent due to API error:', e);
+    }
+  }
+
+  // 2. Fallback to local files
   const release = await dbMutex.acquire();
   try {
     await ensureDbExists();
@@ -81,7 +140,7 @@ export async function saveStudent(student: Student): Promise<boolean> {
     await fs.writeFile(STUDENTS_FILE, JSON.stringify({ students }, null, 2));
     return true;
   } catch (error) {
-    console.error('Error saving student:', error);
+    console.error('Error saving local student:', error);
     return false;
   } finally {
     release();
@@ -90,6 +149,19 @@ export async function saveStudent(student: Student): Promise<boolean> {
 
 // Update student details
 export async function updateStudent(id: string, name: string, email: string): Promise<boolean> {
+  // 1. Try Google Sheets Web App if active
+  if (isGoogleSheetsActive()) {
+    try {
+      const res = await callGoogleScript('updateStudent', { id, name, email });
+      if (res) {
+        return !!res.success;
+      }
+    } catch (e) {
+      console.warn('Fallback to local JSON storage for updateStudent due to API error:', e);
+    }
+  }
+
+  // 2. Fallback to local files
   const release = await dbMutex.acquire();
   try {
     await ensureDbExists();
@@ -105,8 +177,7 @@ export async function updateStudent(id: string, name: string, email: string): Pr
 
     await fs.writeFile(STUDENTS_FILE, JSON.stringify({ students }, null, 2));
 
-    // Also update any matching info in attendance if needed (but usually, student ID is enough.
-    // However, if we cache names in attendance for dashboard performance, we can update them too).
+    // Also update any matching info in local attendance
     try {
       const attData = await fs.readFile(ATTENDANCE_FILE, 'utf-8');
       const attParsed = JSON.parse(attData);
@@ -123,12 +194,12 @@ export async function updateStudent(id: string, name: string, email: string): Pr
         await fs.writeFile(ATTENDANCE_FILE, JSON.stringify({ attendance }, null, 2));
       }
     } catch (e) {
-      console.error('Error updating matching attendance records:', e);
+      console.error('Error updating matching local attendance records:', e);
     }
 
     return true;
   } catch (error) {
-    console.error('Error updating student:', error);
+    console.error('Error updating local student:', error);
     return false;
   } finally {
     release();
@@ -137,6 +208,19 @@ export async function updateStudent(id: string, name: string, email: string): Pr
 
 // Delete student and their attendance records (Right to be Forgotten)
 export async function deleteStudent(id: string): Promise<boolean> {
+  // 1. Try Google Sheets Web App if active
+  if (isGoogleSheetsActive()) {
+    try {
+      const res = await callGoogleScript('deleteStudent', { id });
+      if (res) {
+        return !!res.success;
+      }
+    } catch (e) {
+      console.warn('Fallback to local JSON storage for deleteStudent due to API error:', e);
+    }
+  }
+
+  // 2. Fallback to local files
   const release = await dbMutex.acquire();
   try {
     await ensureDbExists();
@@ -161,7 +245,7 @@ export async function deleteStudent(id: string): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error('Error deleting student:', error);
+    console.error('Error deleting local student:', error);
     return false;
   } finally {
     release();
@@ -170,6 +254,19 @@ export async function deleteStudent(id: string): Promise<boolean> {
 
 // Get all attendance
 export async function getAttendance(): Promise<Attendance[]> {
+  // 1. Try Google Sheets Web App if active
+  if (isGoogleSheetsActive()) {
+    try {
+      const res = await callGoogleScript('getAttendance');
+      if (res && res.success) {
+        return res.attendance || [];
+      }
+    } catch (e) {
+      console.warn('Fallback to local JSON storage for getAttendance due to API error:', e);
+    }
+  }
+
+  // 2. Fallback to local files
   const release = await dbMutex.acquire();
   try {
     await ensureDbExists();
@@ -177,7 +274,7 @@ export async function getAttendance(): Promise<Attendance[]> {
     const parsed = JSON.parse(data);
     return parsed.attendance || [];
   } catch (error) {
-    console.error('Error reading attendance:', error);
+    console.error('Error reading local attendance:', error);
     return [];
   } finally {
     release();
@@ -186,6 +283,24 @@ export async function getAttendance(): Promise<Attendance[]> {
 
 // Save attendance record
 export async function saveAttendance(record: Omit<Attendance, 'id' | 'timestamp'>): Promise<Attendance | null> {
+  // 1. Try Google Sheets Web App if active
+  if (isGoogleSheetsActive()) {
+    try {
+      const newRecord: Attendance = {
+        ...record,
+        id: globalThis.crypto?.randomUUID() || Math.random().toString(36).substring(2, 11),
+        timestamp: new Date().toISOString()
+      };
+      const res = await callGoogleScript('addAttendance', { record: newRecord });
+      if (res && res.success) {
+        return newRecord;
+      }
+    } catch (e) {
+      console.warn('Fallback to local JSON storage for saveAttendance due to API error:', e);
+    }
+  }
+
+  // 2. Fallback to local files
   const release = await dbMutex.acquire();
   try {
     await ensureDbExists();
@@ -195,7 +310,7 @@ export async function saveAttendance(record: Omit<Attendance, 'id' | 'timestamp'
 
     const newRecord: Attendance = {
       ...record,
-      id: globalThis.crypto?.randomUUID() || Math.random().toString(36).substr(2, 9),
+      id: globalThis.crypto?.randomUUID() || Math.random().toString(36).substring(2, 11),
       timestamp: new Date().toISOString()
     };
 
@@ -203,7 +318,7 @@ export async function saveAttendance(record: Omit<Attendance, 'id' | 'timestamp'
     await fs.writeFile(ATTENDANCE_FILE, JSON.stringify({ attendance }, null, 2));
     return newRecord;
   } catch (error) {
-    console.error('Error saving attendance:', error);
+    console.error('Error saving local attendance:', error);
     return null;
   } finally {
     release();
@@ -212,13 +327,26 @@ export async function saveAttendance(record: Omit<Attendance, 'id' | 'timestamp'
 
 // Reset Database (Delete everything)
 export async function resetDatabase(): Promise<boolean> {
+  // 1. Try Google Sheets Web App if active
+  if (isGoogleSheetsActive()) {
+    try {
+      const res = await callGoogleScript('reset');
+      if (res) {
+        return !!res.success;
+      }
+    } catch (e) {
+      console.warn('Fallback to local JSON storage for resetDatabase due to API error:', e);
+    }
+  }
+
+  // 2. Fallback to local files
   const release = await dbMutex.acquire();
   try {
     await fs.writeFile(STUDENTS_FILE, JSON.stringify({ students: [] }, null, 2));
     await fs.writeFile(ATTENDANCE_FILE, JSON.stringify({ attendance: [] }, null, 2));
     return true;
   } catch (error) {
-    console.error('Error resetting database:', error);
+    console.error('Error resetting local database:', error);
     return false;
   } finally {
     release();
