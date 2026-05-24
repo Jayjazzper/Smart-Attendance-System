@@ -1,0 +1,60 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getStudents, saveStudent } from "@/lib/db";
+import { Student } from "@/lib/types";
+
+// Prevent Next.js from caching GET requests, ensuring we get real-time JSON data
+export const dynamic = 'force-dynamic';
+
+export async function GET() {
+  try {
+    const students = await getStudents();
+    return NextResponse.json({ students });
+  } catch (error) {
+    console.error("GET /api/students error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { id, name, email, faceDescriptor, consentGiven } = body;
+
+    // Validate request body
+    if (!id || !name || !email || !faceDescriptor || !consentGiven) {
+      return NextResponse.json(
+        { error: "ข้อมูลนักเรียนไม่ครบถ้วน หรือไม่ได้รับความยินยอม PDPA" },
+        { status: 400 }
+      );
+    }
+
+    if (!Array.isArray(faceDescriptor) || faceDescriptor.length !== 128) {
+      return NextResponse.json(
+        { error: "Face descriptor ต้องเป็นอาร์เรย์ตัวเลขขนาด 128 มิติ" },
+        { status: 400 }
+      );
+    }
+
+    const newStudent: Student = {
+      id: id.trim(),
+      name: name.trim(),
+      email: email.trim(),
+      faceDescriptor,
+      consentGiven: !!consentGiven,
+      registeredAt: new Date().toISOString(),
+    };
+
+    const success = await saveStudent(newStudent);
+    if (!success) {
+      return NextResponse.json(
+        { error: "รหัสนักเรียนนี้ได้รับการลงทะเบียนแล้ว" },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json({ success: true, student: newStudent }, { status: 201 });
+  } catch (error) {
+    console.error("POST /api/students error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
