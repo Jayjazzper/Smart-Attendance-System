@@ -365,3 +365,46 @@ export async function resetDatabase(): Promise<boolean> {
     release();
   }
 }
+
+const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
+
+export interface ClassroomSetting {
+  lineToken?: string;
+}
+
+export interface SystemSettings {
+  classrooms: Record<string, ClassroomSetting>;
+}
+
+export async function getSettings(): Promise<SystemSettings> {
+  const release = await dbMutex.acquire();
+  try {
+    await ensureDbExists();
+    try {
+      await fs.access(SETTINGS_FILE);
+    } catch {
+      await fs.writeFile(SETTINGS_FILE, JSON.stringify({ classrooms: {} }, null, 2));
+    }
+    const data = await fs.readFile(SETTINGS_FILE, 'utf-8');
+    return JSON.parse(data) as SystemSettings;
+  } catch (error) {
+    console.error('Error reading settings:', error);
+    return { classrooms: {} };
+  } finally {
+    release();
+  }
+}
+
+export async function saveSettings(settings: SystemSettings): Promise<boolean> {
+  const release = await dbMutex.acquire();
+  try {
+    await ensureDbExists();
+    await fs.writeFile(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+    return true;
+  } catch (error) {
+    console.error('Error saving settings:', error);
+    return false;
+  } finally {
+    release();
+  }
+}

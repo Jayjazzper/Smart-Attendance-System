@@ -287,6 +287,77 @@ export default function ReportsPage() {
     }
   };
 
+  // 7. Export report to Excel-readable CSV
+  const handleExportCSV = () => {
+    if (studentsStats.length === 0) return;
+
+    const headers = [
+      "รหัสประจำตัว",
+      "ชื่อ-นามสกุล",
+      "ห้องเรียน",
+      "มาเรียน (ครั้ง)",
+      "สาย (ครั้ง)",
+      "ขาด (ครั้ง)",
+      "ลา (ครั้ง)",
+      "ร้อยละการมาเรียน",
+      ...datesList.map(d => {
+        try {
+          return format(new Date(d), "dd/MM/yyyy");
+        } catch (e) {
+          return d;
+        }
+      })
+    ];
+
+    const rows = studentsStats.map(stat => {
+      const statusMap = {
+        present: "มาเรียน",
+        late: "สาย",
+        absent: "ขาด",
+        leave: "ลา",
+        none: "-"
+      };
+      
+      const dailyCells = datesList.map(d => {
+        const status = stat.dailyStatus[d] || "none";
+        return statusMap[status as keyof typeof statusMap] || "-";
+      });
+
+      return [
+        stat.student.id,
+        stat.student.name,
+        stat.student.classroom || "-",
+        stat.presentCount,
+        stat.lateCount,
+        stat.absentCount,
+        stat.leaveCount,
+        `${stat.attendanceRate}%`,
+        ...dailyCells
+      ];
+    });
+
+    const csvContent = [
+      headers.join(","),
+      ...rows.map(r => r.map(cell => {
+        const escaped = String(cell).replace(/"/g, '""');
+        return `"${escaped}"`;
+      }).join(","))
+    ].join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    
+    const fileClassroom = selectedClassroom === "all" ? "ทุกห้อง" : `ห้อง_${selectedClassroom}`;
+    const filename = `รายงานการมาเรียน_${fileClassroom}_${format(new Date(), "yyyyMMdd_HHmmss")}.csv`;
+    link.setAttribute("download", filename);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="flex flex-col gap-6 py-6 animate-fade-in relative">
       {/* Title */}
@@ -302,6 +373,15 @@ export default function ReportsPage() {
 
         {/* Actions Button Row */}
         <div className="flex flex-wrap gap-2.5">
+          <button
+            onClick={handleExportCSV}
+            disabled={studentsStats.length === 0}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm cursor-pointer"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            ส่งออกรายงาน (CSV)
+          </button>
+
           <button
             onClick={() => setShowManualModal(true)}
             className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors shadow-sm cursor-pointer"

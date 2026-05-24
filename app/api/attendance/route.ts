@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getStudents, getAttendance, saveAttendance } from "@/lib/db";
+import { getStudents, getAttendance, saveAttendance, getSettings } from "@/lib/db";
 
 export const dynamic = 'force-dynamic';
 
@@ -57,9 +57,63 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 3. Optional: Trigger LINE Notify if token exists for this classroom
+    try {
+      const settings = await getSettings();
+      const classSettings = settings.classrooms?.[recordClassroom];
+      if (classSettings?.lineToken) {
+        // Run asynchronously without awaiting so the client gets response quickly
+        triggerLineNotification(classSettings.lineToken, newRecord).catch(err => {
+          console.error("Async LINE notify error:", err);
+        });
+      }
+    } catch (err) {
+      console.error("Error triggering LINE notification:", err);
+    }
+
     return NextResponse.json({ success: true, record: newRecord }, { status: 201 });
   } catch (error) {
     console.error("POST /api/attendance error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
+}
+
+async function triggerLineNotification(token: string, record: any) {
+  try {
+    const statusMap = {
+      present: "มาเรียนปกติ ✓",
+      late: "มาเรียนสาย ⚠️",
+      absent: "ขาดเรียน ❌",
+      leave: "ลาเรียน ✉️",
+    };
+    const statusText = statusMap[record.status as keyof typeof statusMap] || record.status;
+    const timestamp = record.timestamp ? new Date(record.timestamp) : new Date();
+    
+    const timeStr = timestamp.toLocaleTimeString("th-TH", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Bangkok",
+    });
+    const dateStr = timestamp.toLocaleDateString("th-TH", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "Asia/Bangkok",
+    });
+
+    const message = `\n📢 รายงานการเช็คชื่อเข้าเรียน\n👤 นักเรียน: ${record.studentName}\n🆔 รหัสประจำตัว: ${record.studentId}\n🏫 ห้องเรียน: ${record.classroom || "-"}\n📅 วันที่: ${dateStr}\n⏰ เวลา: ${timeStr} น.\n📌 สถานะ: ${statusText}`;
+
+    await fetch("https://notify-api.line.me/api/notify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Authorization": `Bearer ${token}`
+      },
+      body: new URLSearchParams({ message }).toString()
+    });
+  } catch (error) {
+    console.error("Error sending LINE Notify message:", error);
   }
 }
