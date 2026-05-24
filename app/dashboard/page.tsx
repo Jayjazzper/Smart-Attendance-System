@@ -20,11 +20,14 @@ interface DashboardScan {
   email: string;
   time: string;
   confidence: number;
+  classroom?: string;
+  status?: 'present' | 'late' | 'absent' | 'leave';
 }
 
 interface DashboardMetrics {
   totalStudents: number;
   presentToday: number;
+  lateToday: number;
   attendanceRate: number;
   trendData: { day: string; rate: number }[];
   recentScans: DashboardScan[];
@@ -35,10 +38,12 @@ export default function DashboardPage() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
+  const [selectedLevel, setSelectedLevel] = useState<"all" | "kindergarten" | "primary" | "secondary">("all");
   
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalStudents: 0,
     presentToday: 0,
+    lateToday: 0,
     attendanceRate: 0,
     trendData: [],
     recentScans: [],
@@ -49,12 +54,13 @@ export default function DashboardPage() {
   const fetchMetrics = async (showLoadingState = false) => {
     if (showLoadingState) setLoading(true);
     try {
-      const res = await fetch("/api/dashboard");
+      const res = await fetch(`/api/dashboard?level=${selectedLevel}`);
       if (res.ok) {
         const data = await res.json();
         setMetrics({
           totalStudents: data.totalStudents || 0,
           presentToday: data.presentToday || 0,
+          lateToday: data.lateToday || 0,
           attendanceRate: data.attendanceRate || 0,
           trendData: data.trendData || [],
           recentScans: data.recentScans || [],
@@ -76,7 +82,7 @@ export default function DashboardPage() {
     }, 5000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedLevel]);
 
   // 3. Wipes database and clears local states
   const handleWipeData = async () => {
@@ -129,6 +135,28 @@ export default function DashboardPage() {
         </button>
       </div>
 
+      {/* Division Level Filters */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+        {[
+          { id: "all", label: "ทุกระดับชั้น" },
+          { id: "kindergarten", label: "ระดับอนุบาล (อ.2-อ.3)" },
+          { id: "primary", label: "ระดับประถม (ป.1-ป.6)" },
+          { id: "secondary", label: "ระดับมัธยม (ม.1-ม.6)" }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setSelectedLevel(tab.id as any)}
+            className={`rounded-xl px-4 py-2 text-xs font-bold transition-all border whitespace-nowrap cursor-pointer ${
+              selectedLevel === tab.id
+                ? "bg-blue-600 border-blue-600 text-white shadow-sm shadow-blue-500/20"
+                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 text-slate-400 gap-3">
           <svg className="animate-spin h-8 w-8 text-blue-500" fill="none" viewBox="0 0 24 24">
@@ -139,8 +167,8 @@ export default function DashboardPage() {
         </div>
       ) : (
         <>
-          {/* 3 KPI Summary Cards */}
-          <div className="grid gap-4 sm:grid-cols-3 mt-2 animate-fade-in">
+          {/* 4 KPI Summary Cards */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mt-2 animate-fade-in">
             {/* Card 1: Registered Students */}
             <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm flex items-center justify-between">
               <div className="flex flex-col gap-1">
@@ -159,10 +187,7 @@ export default function DashboardPage() {
                 <span className="text-xs font-bold text-slate-500">มาเรียนวันนี้</span>
                 <span className="text-2xl font-extrabold text-slate-900">{metrics.presentToday} คน</span>
                 <span className="text-[10px] text-emerald-600 font-bold mt-1">
-                  {metrics.totalStudents > 0 
-                    ? `✓ คิดเป็น ${Math.round((metrics.presentToday / metrics.totalStudents) * 100)}% ของนักเรียนทั้งหมด`
-                    : "ไม่มีรายชื่อในระบบ"
-                  }
+                  มาตรงเวลา: {metrics.presentToday - metrics.lateToday} คน
                 </span>
               </div>
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600">
@@ -170,7 +195,24 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Card 3: Attendance Rate */}
+            {/* Card 3: Late Today */}
+            <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm flex items-center justify-between">
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-bold text-slate-500">มาเรียนสายวันนี้</span>
+                <span className="text-2xl font-extrabold text-amber-600">{metrics.lateToday} คน</span>
+                <span className="text-[10px] text-amber-600 font-bold mt-1">
+                  {metrics.presentToday > 0
+                    ? `คิดเป็น ${Math.round((metrics.lateToday / metrics.presentToday) * 100)}% ของผู้มาเรียน`
+                    : "ไม่มีผู้เข้าเรียนสาย"
+                  }
+                </span>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+            </div>
+
+            {/* Card 4: Attendance Rate */}
             <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm flex items-center justify-between">
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-bold text-slate-500">อัตราการเข้าเรียนวันนี้</span>
@@ -220,6 +262,8 @@ export default function DashboardPage() {
                         <th className="py-3 px-2">เวลาสแกน</th>
                         <th className="py-3 px-2">รหัสนักเรียน</th>
                         <th className="py-3 px-2">ชื่อ-นามสกุล</th>
+                        <th className="py-3 px-2">ห้องเรียน</th>
+                        <th className="py-3 px-2">สถานะ</th>
                         <th className="py-3 px-2 hidden sm:table-cell">อีเมล</th>
                         <th className="py-3 px-2 text-right">ความแม่นยำ AI</th>
                       </tr>
@@ -231,6 +275,24 @@ export default function DashboardPage() {
                             <td className="py-3.5 px-2 text-slate-900 font-bold">{scan.time}</td>
                             <td className="py-3.5 px-2 text-slate-500">{scan.studentId}</td>
                             <td className="py-3.5 px-2 font-bold text-slate-900">{scan.name}</td>
+                            <td className="py-3.5 px-2">
+                              {scan.classroom ? (
+                                <span className="rounded bg-blue-50 border border-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                                  {scan.classroom}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-xs">-</span>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-2">
+                              <span className={`rounded px-2 py-0.5 text-[10px] font-bold ${
+                                scan.status === "late"
+                                  ? "bg-amber-50 border border-amber-100 text-amber-600"
+                                  : "bg-emerald-50 border border-emerald-100 text-emerald-600"
+                              }`}>
+                                {scan.status === "late" ? "สาย" : "มาเรียน"}
+                              </span>
+                            </td>
                             <td className="py-3.5 px-2 text-slate-400 hidden sm:table-cell">{scan.email}</td>
                             <td className="py-3.5 px-2 text-right text-emerald-600 font-bold">
                               {scan.confidence}% (OK)
@@ -239,7 +301,7 @@ export default function DashboardPage() {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5} className="py-12 text-center text-slate-400">
+                          <td colSpan={7} className="py-12 text-center text-slate-400">
                             ยังไม่มีรายชื่อเช็คชื่อเข้าห้องเรียนในวันนี้
                           </td>
                         </tr>

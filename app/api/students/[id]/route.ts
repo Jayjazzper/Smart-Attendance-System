@@ -24,13 +24,19 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const { id: studentId } = await params;
     const body = await req.json();
-    const { name, email } = body;
+    const { name, email, classroom, level } = body;
 
-    if (!name || !email) {
-      return NextResponse.json({ error: "กรุณาระบุชื่อและอีเมลใหม่" }, { status: 400 });
+    if (!name || !email || !classroom || !level) {
+      return NextResponse.json({ error: "กรุณาระบุชื่อ อีเมล ระดับชั้น และห้องเรียน" }, { status: 400 });
     }
 
-    const success = await updateStudent(studentId, name.trim(), email.trim());
+    const success = await updateStudent(
+      studentId,
+      name.trim(),
+      email.trim(),
+      classroom.trim(),
+      level.trim() as 'kindergarten' | 'primary' | 'secondary'
+    );
     if (!success) {
       return NextResponse.json({ error: "ไม่พบข้อมูลนักเรียนที่จะแก้ไข" }, { status: 404 });
     }

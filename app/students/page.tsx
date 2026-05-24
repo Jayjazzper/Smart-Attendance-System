@@ -10,6 +10,7 @@ export default function StudentsPage() {
   const [loading, setLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [levelFilter, setLevelFilter] = useState<"all" | "kindergarten" | "primary" | "secondary">("all");
 
   // 1. Fetch live students from API
   const fetchStudents = async () => {
@@ -30,13 +31,16 @@ export default function StudentsPage() {
     fetchStudents();
   }, []);
 
-  // Search filter
+  // Search and Level filter
   const filteredStudents = students.filter((s) => {
-    return (
+    const matchesSearch =
       s.id.includes(searchTerm) ||
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+      s.email.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesLevel = levelFilter === "all" || s.level === levelFilter;
+    
+    return matchesSearch && matchesLevel;
   });
 
   // 2. Perform actual deletion request to Next.js API route
@@ -89,32 +93,56 @@ export default function StudentsPage() {
       {/* Main Container */}
       <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm flex flex-col gap-4 mt-2">
         {/* Table filters */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
-            <input
-              type="text"
-              placeholder="ค้นหาด้วยรหัส ชื่อ หรืออีเมล..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 py-2 text-xs font-semibold placeholder-slate-400 focus:border-blue-500 focus:outline-none transition-colors"
-            />
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-            >
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" y1="21" x2="16.65" y2="16.65" />
-            </svg>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="relative flex-1 max-w-sm">
+              <input
+                type="text"
+                placeholder="ค้นหาด้วยรหัส ชื่อ หรืออีเมล..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3.5 py-2 text-xs font-semibold placeholder-slate-400 focus:border-blue-500 focus:outline-none transition-colors"
+              />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+              >
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+            </div>
+            <span className="text-xs font-bold text-slate-400">
+              แสดง {filteredStudents.length} จาก {students.length} รายการ
+            </span>
           </div>
-          <span className="text-xs font-bold text-slate-400">
-            แสดง {filteredStudents.length} จาก {students.length} รายการ
-          </span>
+
+          {/* Level Filters */}
+          <div className="flex items-center gap-1.5 overflow-x-auto">
+            {[
+              { id: "all", label: "ทุกระดับชั้น" },
+              { id: "kindergarten", label: "อนุบาล" },
+              { id: "primary", label: "ประถม" },
+              { id: "secondary", label: "มัธยม" }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setLevelFilter(tab.id as any)}
+                className={`rounded-xl px-3 py-1.5 text-[11px] font-bold transition-all border whitespace-nowrap cursor-pointer ${
+                  levelFilter === tab.id
+                    ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                    : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Table list */}
@@ -134,6 +162,8 @@ export default function StudentsPage() {
                   <tr className="text-left text-xs font-bold text-slate-400 uppercase tracking-wider">
                     <th className="py-3 px-2">รหัสนักเรียน</th>
                     <th className="py-3 px-2">ชื่อ-นามสกุล</th>
+                    <th className="py-3 px-2">ห้องเรียน</th>
+                    <th className="py-3 px-2">ระดับชั้น</th>
                     <th className="py-3 px-2 hidden sm:table-cell">อีเมล</th>
                     <th className="py-3 px-2 hidden md:table-cell">วันที่ลงทะเบียน</th>
                     <th className="py-3 px-2 text-right">การจัดการ</th>
@@ -145,6 +175,24 @@ export default function StudentsPage() {
                       <tr key={student.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="py-3.5 px-2 text-slate-900 font-bold">{student.id}</td>
                         <td className="py-3.5 px-2 font-bold text-slate-900">{student.name}</td>
+                        <td className="py-3.5 px-2">
+                          {student.classroom ? (
+                            <span className="rounded bg-blue-50 border border-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-600">
+                              {student.classroom}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs">-</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-2">
+                          {student.level ? (
+                            <span className="rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">
+                              {student.level === 'kindergarten' ? 'อนุบาล' : student.level === 'primary' ? 'ประถม' : 'มัธยม'}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 text-xs">-</span>
+                          )}
+                        </td>
                         <td className="py-3.5 px-2 text-slate-400 hidden sm:table-cell">{student.email}</td>
                         <td className="py-3.5 px-2 text-slate-400 hidden md:table-cell">
                           {new Date(student.registeredAt).toLocaleDateString("th-TH", {
@@ -171,7 +219,7 @@ export default function StudentsPage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="py-12 text-center text-slate-400">
+                      <td colSpan={7} className="py-12 text-center text-slate-400">
                         ไม่พบข้อมูลที่ตรงกับเงื่อนไขการค้นหา
                       </td>
                     </tr>

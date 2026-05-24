@@ -20,6 +20,8 @@ interface CheckInLog {
   name: string;
   time: string;
   distance: number;
+  classroom?: string;
+  status?: 'present' | 'late' | 'absent' | 'leave';
 }
 
 export default function CheckInPage() {
@@ -28,6 +30,8 @@ export default function CheckInPage() {
   const [matchStatus, setMatchStatus] = useState<"searching" | "found" | "failed">("searching");
   const [currentMatch, setCurrentMatch] = useState<CheckInLog | null>(null);
   const [history, setHistory] = useState<CheckInLog[]>([]);
+  const [homeroomTime, setHomeroomTime] = useState("08:00");
+  const [lateLimitTime, setLateLimitTime] = useState("08:30");
 
   // 1. Fetch recent scan history on load
   const fetchRecentLogs = async () => {
@@ -47,6 +51,8 @@ export default function CheckInPage() {
               time: date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น.",
               // Reconstruct mockup distance for list presentation (mapped back from confidence score)
               distance: parseFloat(((100 - record.confidence) / 100).toFixed(2)),
+              classroom: record.classroom || "",
+              status: record.status || "present",
             };
           });
         setHistory(logs);
@@ -61,7 +67,11 @@ export default function CheckInPage() {
   }, []);
 
   // 2. Callback when face matching finishes processing a frame
-  const handleFaceMatch = async (matchedStudent: Student | null, distance: number) => {
+  const handleFaceMatch = async (
+    matchedStudent: Student | null,
+    distance: number,
+    status?: 'present' | 'late' | 'absent' | 'leave'
+  ) => {
     const formattedTime = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น.";
     
     if (matchedStudent) {
@@ -71,6 +81,8 @@ export default function CheckInPage() {
         name: matchedStudent.name,
         time: formattedTime,
         distance,
+        classroom: matchedStudent.classroom || "",
+        status: status || "present",
       };
       setCurrentMatch(matchedLog);
       setMatchStatus("found");
@@ -108,9 +120,42 @@ export default function CheckInPage() {
       </div>
 
       {/* Main Container Layout */}
+      {/* Main Container Layout */}
       <div className="grid gap-8 lg:grid-cols-12 mt-2">
-        {/* Left Side: Webcam Frame */}
+        {/* Left Side: Webcam Frame & Settings */}
         <div className="lg:col-span-8 flex flex-col gap-4">
+          {/* Time Settings Panel */}
+          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              ตั้งค่าเกณฑ์เวลาเช็คสาย
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">
+                  เวลาเข้าแถว (เริ่มนับสาย)
+                </label>
+                <input
+                  type="time"
+                  value={homeroomTime}
+                  onChange={(e) => setHomeroomTime(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-blue-500 focus:outline-none transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1">
+                  เกณฑ์สายสุด (เริ่มนับขาด)
+                </label>
+                <input
+                  type="time"
+                  value={lateLimitTime}
+                  onChange={(e) => setLateLimitTime(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-blue-500 focus:outline-none transition-colors"
+                />
+              </div>
+            </div>
+          </div>
+
           <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
             {/* Mode Controls */}
             <div className="flex items-center justify-between mb-4">
@@ -167,6 +212,8 @@ export default function CheckInPage() {
                 setIsScanning={setIsScanning}
                 onMatch={handleFaceMatch}
                 setMatchStatus={setMatchStatus}
+                homeroomTime={homeroomTime}
+                lateLimitTime={lateLimitTime}
               />
 
               {/* Scanning visual frames guides */}
@@ -189,7 +236,23 @@ export default function CheckInPage() {
                       {matchStatus === "found" ? "OK" : "ERR"}
                     </div>
                     <div className="flex flex-col gap-0.5">
-                      <h4 className="text-sm font-bold">{currentMatch.name}</h4>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-sm font-bold">{currentMatch.name}</h4>
+                        {matchStatus === "found" && currentMatch.classroom && (
+                          <span className="rounded bg-blue-500/20 border border-blue-500/30 px-1.5 py-0.5 text-[10px] font-bold text-blue-300">
+                            {currentMatch.classroom}
+                          </span>
+                        )}
+                        {matchStatus === "found" && (
+                          <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                            currentMatch.status === "late"
+                              ? "bg-amber-500/20 border border-amber-500/30 text-amber-400"
+                              : "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400"
+                          }`}>
+                            {currentMatch.status === "late" ? "สาย" : "มาเรียน"}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[10px] text-slate-400 font-semibold">
                         {currentMatch.id !== "Unknown" ? `รหัสประจำตัว: ${currentMatch.id}` : "ไม่พบประวัตินักเรียนในระบบ"}
                       </p>
@@ -260,8 +323,21 @@ export default function CheckInPage() {
                         {record.name.charAt(0)}
                       </div>
                       <div className="flex flex-col gap-0.5">
-                        <span className="text-xs font-bold text-slate-900">{record.name}</span>
-                        <span className="text-[9px] text-slate-500 font-semibold">รหัส: {record.id}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-slate-900">{record.name}</span>
+                          {record.classroom && (
+                            <span className="rounded bg-slate-200 px-1 py-0.2 text-[8px] font-bold text-slate-600">
+                              {record.classroom}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-semibold">
+                          <span>รหัส: {record.id}</span>
+                          <span>•</span>
+                          <span className={`font-bold ${record.status === "late" ? "text-amber-600" : "text-emerald-600"}`}>
+                            {record.status === "late" ? "สาย" : "มาเรียน"}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-0.5">

@@ -4,6 +4,78 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
+const LEVELS = [
+  { value: "kindergarten", label: "ระดับอนุบาล" },
+  { value: "primary", label: "ระดับประถมศึกษา" },
+  { value: "secondary", label: "ระดับมัธยมศึกษา" },
+];
+
+const GRADE_LEVELS = {
+  kindergarten: [
+    { value: "อนุบาล 2", label: "อนุบาล 2" },
+    { value: "อนุบาล 3", label: "อนุบาล 3" },
+  ],
+  primary: [
+    { value: "ประถมศึกษาปีที่ 1", label: "ประถมศึกษาปีที่ 1 (ป.1)" },
+    { value: "ประถมศึกษาปีที่ 2", label: "ประถมศึกษาปีที่ 2 (ป.2)" },
+    { value: "ประถมศึกษาปีที่ 3", label: "ประถมศึกษาปีที่ 3 (ป.3)" },
+    { value: "ประถมศึกษาปีที่ 4", label: "ประถมศึกษาปีที่ 4 (ป.4)" },
+    { value: "ประถมศึกษาปีที่ 5", label: "ประถมศึกษาปีที่ 5 (ป.5)" },
+    { value: "ประถมศึกษาปีที่ 6", label: "ประถมศึกษาปีที่ 6 (ป.6)" },
+  ],
+  secondary: [
+    { value: "มัธยมศึกษาปีที่ 1", label: "มัธยมศึกษาปีที่ 1 (ม.1)" },
+    { value: "มัธยมศึกษาปีที่ 2", label: "มัธยมศึกษาปีที่ 2 (ม.2)" },
+    { value: "มัธยมศึกษาปีที่ 3", label: "มัธยมศึกษาปีที่ 3 (ม.3)" },
+    { value: "มัธยมศึกษาปีที่ 4", label: "มัธยมศึกษาปีที่ 4 (ม.4)" },
+    { value: "มัธยมศึกษาปีที่ 5", label: "มัธยมศึกษาปีที่ 5 (ม.5)" },
+    { value: "มัธยมศึกษาปีที่ 6", label: "มัธยมศึกษาปีที่ 6 (ม.6)" },
+  ],
+};
+
+const ROOMS = ["ห้อง 1", "ห้อง 2", "ห้อง 3", "ห้อง 4", "ห้อง 5"];
+
+function getAbbreviatedClassroom(grade: string, room: string): string {
+  const roomNumber = room.replace("ห้อง ", "");
+  if (grade.startsWith("อนุบาล")) {
+    const kNum = grade.split(" ")[1];
+    return `อ.${kNum}/${roomNumber}`;
+  }
+  if (grade.startsWith("ประถม")) {
+    const pNum = grade.split(" ")[2];
+    return `ป.${pNum}/${roomNumber}`;
+  }
+  if (grade.startsWith("มัธยม")) {
+    const mNum = grade.split(" ")[2];
+    return `ม.${mNum}/${roomNumber}`;
+  }
+  return `${grade}/${roomNumber}`;
+}
+
+function parseClassroomString(classroomStr: string): { grade: string; room: string } {
+  if (!classroomStr) return { grade: "ประถมศึกษาปีที่ 1", room: "ห้อง 1" };
+  const parts = classroomStr.split("/");
+  const prefixAndNum = parts[0]; // e.g. "ป.4", "ม.3", "อ.2"
+  const roomNum = parts[1] || "1"; // e.g. "2"
+  
+  let grade = "ประถมศึกษาปีที่ 1";
+  if (prefixAndNum.startsWith("อ.")) {
+    const num = prefixAndNum.replace("อ.", "");
+    grade = `อนุบาล ${num}`;
+  } else if (prefixAndNum.startsWith("ป.")) {
+    const num = prefixAndNum.replace("ป.", "");
+    grade = `ประถมศึกษาปีที่ ${num}`;
+  } else if (prefixAndNum.startsWith("ม.")) {
+    const num = prefixAndNum.replace("ม.", "");
+    grade = `มัธยมศึกษาปีที่ ${num}`;
+  }
+  
+  return {
+    grade,
+    room: `ห้อง ${roomNum}`,
+  };
+}
+
 export default function EditStudentPage() {
   const params = useParams();
   const router = useRouter();
@@ -13,6 +85,9 @@ export default function EditStudentPage() {
     id: studentId || "",
     name: "",
     email: "",
+    division: "primary" as "kindergarten" | "primary" | "secondary",
+    grade: "ประถมศึกษาปีที่ 1",
+    room: "ห้อง 1",
   });
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
@@ -26,10 +101,14 @@ export default function EditStudentPage() {
         if (response.ok) {
           const data = await response.json();
           const student = data.student;
+          const parsed = parseClassroomString(student.classroom || "");
           setFormData({
             id: student.id,
             name: student.name,
             email: student.email,
+            division: student.level || "primary",
+            grade: parsed.grade,
+            room: parsed.room,
           });
         } else {
           setErrorMessage("ไม่สามารถดึงข้อมูลนักเรียนรหัสนี้ได้");
@@ -48,12 +127,21 @@ export default function EditStudentPage() {
     }
   }, [studentId]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        [name]: value,
+      };
+      
+      // If division changes, automatically update grade to the first option of new division
+      if (name === "division") {
+        const nextDivision = value as "kindergarten" | "primary" | "secondary";
+        next.grade = GRADE_LEVELS[nextDivision][0].value;
+      }
+      return next;
+    });
   };
 
   // 2. Submit updates via PUT API route
@@ -71,6 +159,8 @@ export default function EditStudentPage() {
         body: JSON.stringify({
           name: formData.name,
           email: formData.email,
+          classroom: getAbbreviatedClassroom(formData.grade, formData.room),
+          level: formData.division,
         }),
       });
 
@@ -166,6 +256,54 @@ export default function EditStudentPage() {
                 disabled={status === "saving" || status === "success"}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm placeholder-slate-400 focus:border-blue-500 focus:outline-none transition-colors"
               />
+            </div>
+
+            {/* Division & Grade & Room */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5 col-span-2">
+                <label className="text-xs font-bold text-slate-700">ระดับชั้นเรียน</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <select
+                    name="division"
+                    value={formData.division}
+                    onChange={handleChange}
+                    disabled={status === "saving" || status === "success"}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none transition-colors"
+                  >
+                    {LEVELS.map((lvl) => (
+                      <option key={lvl.value} value={lvl.value}>{lvl.label}</option>
+                    ))}
+                  </select>
+                  
+                  <select
+                    name="grade"
+                    value={formData.grade}
+                    onChange={handleChange}
+                    disabled={status === "saving" || status === "success"}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none transition-colors"
+                  >
+                    {GRADE_LEVELS[formData.division].map((grd) => (
+                      <option key={grd.value} value={grd.value}>{grd.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5 col-span-2">
+                <label htmlFor="room" className="text-xs font-bold text-slate-700">ห้องเรียน</label>
+                <select
+                  id="room"
+                  name="room"
+                  value={formData.room}
+                  onChange={handleChange}
+                  disabled={status === "saving" || status === "success"}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none transition-colors"
+                >
+                  {ROOMS.map((rm) => (
+                    <option key={rm} value={rm}>{rm}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             {/* Feedback/Error messages */}

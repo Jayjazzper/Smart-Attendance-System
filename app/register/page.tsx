@@ -4,6 +4,54 @@ import { useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 
+const LEVELS = [
+  { value: "kindergarten", label: "ระดับอนุบาล" },
+  { value: "primary", label: "ระดับประถมศึกษา" },
+  { value: "secondary", label: "ระดับมัธยมศึกษา" },
+];
+
+const GRADE_LEVELS = {
+  kindergarten: [
+    { value: "อนุบาล 2", label: "อนุบาล 2" },
+    { value: "อนุบาล 3", label: "อนุบาล 3" },
+  ],
+  primary: [
+    { value: "ประถมศึกษาปีที่ 1", label: "ประถมศึกษาปีที่ 1 (ป.1)" },
+    { value: "ประถมศึกษาปีที่ 2", label: "ประถมศึกษาปีที่ 2 (ป.2)" },
+    { value: "ประถมศึกษาปีที่ 3", label: "ประถมศึกษาปีที่ 3 (ป.3)" },
+    { value: "ประถมศึกษาปีที่ 4", label: "ประถมศึกษาปีที่ 4 (ป.4)" },
+    { value: "ประถมศึกษาปีที่ 5", label: "ประถมศึกษาปีที่ 5 (ป.5)" },
+    { value: "ประถมศึกษาปีที่ 6", label: "ประถมศึกษาปีที่ 6 (ป.6)" },
+  ],
+  secondary: [
+    { value: "มัธยมศึกษาปีที่ 1", label: "มัธยมศึกษาปีที่ 1 (ม.1)" },
+    { value: "มัธยมศึกษาปีที่ 2", label: "มัธยมศึกษาปีที่ 2 (ม.2)" },
+    { value: "มัธยมศึกษาปีที่ 3", label: "มัธยมศึกษาปีที่ 3 (ม.3)" },
+    { value: "มัธยมศึกษาปีที่ 4", label: "มัธยมศึกษาปีที่ 4 (ม.4)" },
+    { value: "มัธยมศึกษาปีที่ 5", label: "มัธยมศึกษาปีที่ 5 (ม.5)" },
+    { value: "มัธยมศึกษาปีที่ 6", label: "มัธยมศึกษาปีที่ 6 (ม.6)" },
+  ],
+};
+
+const ROOMS = ["ห้อง 1", "ห้อง 2", "ห้อง 3", "ห้อง 4", "ห้อง 5"];
+
+function getAbbreviatedClassroom(grade: string, room: string): string {
+  const roomNumber = room.replace("ห้อง ", "");
+  if (grade.startsWith("อนุบาล")) {
+    const kNum = grade.split(" ")[1];
+    return `อ.${kNum}/${roomNumber}`;
+  }
+  if (grade.startsWith("ประถม")) {
+    const pNum = grade.split(" ")[2];
+    return `ป.${pNum}/${roomNumber}`;
+  }
+  if (grade.startsWith("มัธยม")) {
+    const mNum = grade.split(" ")[2];
+    return `ม.${mNum}/${roomNumber}`;
+  }
+  return `${grade}/${roomNumber}`;
+}
+
 // Load CameraCapture component with SSR disabled to prevent SSR browser-globals errors
 const CameraCapture = dynamic(() => import("@/components/CameraCapture"), {
   ssr: false,
@@ -19,17 +67,31 @@ export default function RegisterPage() {
     id: "",
     name: "",
     email: "",
+    division: "primary" as "kindergarten" | "primary" | "secondary",
+    grade: "ประถมศึกษาปีที่ 1",
+    room: "ห้อง 1",
     consent: false,
   });
   const [status, setStatus] = useState<"idle" | "capturing" | "scanning" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
+    
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        [name]: type === "checkbox" ? checked : value,
+      };
+      
+      // If division changes, automatically update grade to the first option of new division
+      if (name === "division") {
+        const nextDivision = value as "kindergarten" | "primary" | "secondary";
+        next.grade = GRADE_LEVELS[nextDivision][0].value;
+      }
+      return next;
+    });
   };
 
   // Called when camera successfully extracts a 128d face descriptor vector
@@ -46,6 +108,8 @@ export default function RegisterPage() {
           email: formData.email,
           faceDescriptor: descriptorArray,
           consentGiven: formData.consent,
+          classroom: getAbbreviatedClassroom(formData.grade, formData.room),
+          level: formData.division,
         }),
       });
 
@@ -153,6 +217,54 @@ export default function RegisterPage() {
                 />
               </div>
 
+              {/* Division & Grade & Room */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5 col-span-2">
+                  <label className="text-xs font-bold text-slate-700">ระดับชั้นเรียน</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      name="division"
+                      value={formData.division}
+                      onChange={handleChange}
+                      disabled={status === "capturing" || status === "scanning" || status === "success"}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none transition-colors"
+                    >
+                      {LEVELS.map((lvl) => (
+                        <option key={lvl.value} value={lvl.value}>{lvl.label}</option>
+                      ))}
+                    </select>
+                    
+                    <select
+                      name="grade"
+                      value={formData.grade}
+                      onChange={handleChange}
+                      disabled={status === "capturing" || status === "scanning" || status === "success"}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none transition-colors"
+                    >
+                      {GRADE_LEVELS[formData.division].map((grd) => (
+                        <option key={grd.value} value={grd.value}>{grd.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5 col-span-2">
+                  <label htmlFor="room" className="text-xs font-bold text-slate-700">ห้องเรียน</label>
+                  <select
+                    id="room"
+                    name="room"
+                    value={formData.room}
+                    onChange={handleChange}
+                    disabled={status === "capturing" || status === "scanning" || status === "success"}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none transition-colors"
+                  >
+                    {ROOMS.map((rm) => (
+                      <option key={rm} value={rm}>{rm}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
               {/* Consent Box */}
               <div className="mt-2 rounded-xl bg-slate-50 p-4 border border-slate-100">
                 <div className="flex items-start gap-3">
@@ -206,7 +318,15 @@ export default function RegisterPage() {
                 <div className="flex gap-3 mt-2">
                   <button
                     onClick={() => {
-                      setFormData({ id: "", name: "", email: "", consent: false });
+                      setFormData({
+                        id: "",
+                        name: "",
+                        email: "",
+                        division: "primary",
+                        grade: "ประถมศึกษาปีที่ 1",
+                        room: "ห้อง 1",
+                        consent: false,
+                      });
                       setStatus("idle");
                     }}
                     className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm cursor-pointer"

@@ -18,10 +18,10 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, name, email, faceDescriptor, consentGiven } = body;
+    const { id, name, email, faceDescriptor, consentGiven, classroom, level } = body;
 
     // Validate request body
-    if (!id || !name || !email || !faceDescriptor || !consentGiven) {
+    if (!id || !name || !email || !faceDescriptor || !consentGiven || !classroom || !level) {
       return NextResponse.json(
         { error: "ข้อมูลนักเรียนไม่ครบถ้วน หรือไม่ได้รับความยินยอม PDPA" },
         { status: 400 }
@@ -42,6 +42,8 @@ export async function POST(req: NextRequest) {
       faceDescriptor,
       consentGiven: !!consentGiven,
       registeredAt: new Date().toISOString(),
+      classroom: classroom.trim(),
+      level: level.trim() as 'kindergarten' | 'primary' | 'secondary',
     };
 
     const success = await saveStudent(newStudent);

@@ -12,17 +12,35 @@ function doPost(e) {
     // Open active spreadsheet
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     
-    // Get or create sheets
+    // Get or create sheets with updated columns
     var studentSheet = ss.getSheetByName("students");
     if (!studentSheet) {
       studentSheet = ss.insertSheet("students");
-      studentSheet.appendRow(["id", "name", "email", "faceDescriptor"]);
+      studentSheet.appendRow(["id", "name", "email", "faceDescriptor", "classroom", "level"]);
+    } else {
+      // Ensure headers exist for new columns (upgrade existing sheets)
+      var headers = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 6).getValues()[0];
+      if (headers.indexOf("classroom") === -1) {
+        studentSheet.getRange(1, 5).setValue("classroom");
+      }
+      if (headers.indexOf("level") === -1) {
+        studentSheet.getRange(1, 6).setValue("level");
+      }
     }
     
     var attendanceSheet = ss.getSheetByName("attendance");
     if (!attendanceSheet) {
       attendanceSheet = ss.insertSheet("attendance");
-      attendanceSheet.appendRow(["id", "studentId", "studentName", "studentEmail", "timestamp", "confidence"]);
+      attendanceSheet.appendRow(["id", "studentId", "studentName", "studentEmail", "timestamp", "confidence", "classroom", "status"]);
+    } else {
+      // Ensure headers exist for new columns (upgrade existing sheets)
+      var headers = attendanceSheet.getRange(1, 1, 1, attendanceSheet.getLastColumn() || 8).getValues()[0];
+      if (headers.indexOf("classroom") === -1) {
+        attendanceSheet.getRange(1, 7).setValue("classroom");
+      }
+      if (headers.indexOf("status") === -1) {
+        attendanceSheet.getRange(1, 8).setValue("status");
+      }
     }
     
     if (action === "getStudents") {
@@ -42,7 +60,9 @@ function doPost(e) {
             id: String(row[0]),
             name: String(row[1]),
             email: String(row[2]),
-            faceDescriptor: faceDesc
+            faceDescriptor: faceDesc,
+            classroom: row[4] ? String(row[4]) : "",
+            level: row[5] ? String(row[5]) : ""
           });
         }
       }
@@ -66,7 +86,9 @@ function doPost(e) {
           student.id,
           student.name,
           student.email,
-          JSON.stringify(student.faceDescriptor)
+          JSON.stringify(student.faceDescriptor),
+          student.classroom || "",
+          student.level || ""
         ]);
         result = { success: true };
       }
@@ -75,6 +97,8 @@ function doPost(e) {
       var id = postData.id;
       var name = postData.name;
       var email = postData.email;
+      var classroom = postData.classroom;
+      var level = postData.level;
       
       var data = studentSheet.getDataRange().getValues();
       var updated = false;
@@ -82,6 +106,8 @@ function doPost(e) {
         if (String(data[i][0]) === String(id)) {
           studentSheet.getRange(i + 1, 2).setValue(name); // Column B
           studentSheet.getRange(i + 1, 3).setValue(email); // Column C
+          if (classroom !== undefined) studentSheet.getRange(i + 1, 5).setValue(classroom); // Column E
+          if (level !== undefined) studentSheet.getRange(i + 1, 6).setValue(level); // Column F
           updated = true;
           break;
         }
@@ -94,6 +120,7 @@ function doPost(e) {
           if (String(attData[j][1]) === String(id)) { // Column B is studentId
             attendanceSheet.getRange(j + 1, 3).setValue(name);  // Column C is studentName
             attendanceSheet.getRange(j + 1, 4).setValue(email); // Column D is studentEmail
+            if (classroom !== undefined) attendanceSheet.getRange(j + 1, 7).setValue(classroom); // Column G
           }
         }
         result = { success: true };
@@ -138,7 +165,9 @@ function doPost(e) {
             studentName: String(row[2]),
             studentEmail: String(row[3]),
             timestamp: String(row[4]),
-            confidence: Number(row[5])
+            confidence: Number(row[5]),
+            classroom: row[6] ? String(row[6]) : "",
+            status: row[7] ? String(row[7]) : "present"
           });
         }
       }
@@ -152,7 +181,9 @@ function doPost(e) {
         record.studentName,
         record.studentEmail,
         record.timestamp,
-        Number(record.confidence)
+        Number(record.confidence),
+        record.classroom || "",
+        record.status || "present"
       ]);
       result = { success: true };
       

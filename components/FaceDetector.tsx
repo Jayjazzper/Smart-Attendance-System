@@ -8,8 +8,10 @@ interface FaceDetectorProps {
   scanMode: "auto" | "manual";
   isScanning: boolean;
   setIsScanning: (scanning: boolean) => void;
-  onMatch: (student: Student | null, distance: number) => void;
+  onMatch: (student: Student | null, distance: number, status?: 'present' | 'late' | 'absent' | 'leave') => void;
   setMatchStatus: (status: "searching" | "found" | "failed") => void;
+  homeroomTime?: string;
+  lateLimitTime?: string;
 }
 
 export default function FaceDetector({
@@ -18,6 +20,8 @@ export default function FaceDetector({
   setIsScanning,
   onMatch,
   setMatchStatus,
+  homeroomTime = "08:00",
+  lateLimitTime = "08:30",
 }: FaceDetectorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -164,6 +168,19 @@ export default function FaceDetector({
       if (minDistance < 0.75 && bestMatch) {
         const matchedStudent = bestMatch as Student;
         setMatchStatus("found");
+
+        // Calculate status: "present" or "late" based on current local time
+        let checkInStatus: "present" | "late" = "present";
+        const now = new Date();
+        const currentHours = now.getHours();
+        const currentMinutes = now.getMinutes();
+        
+        // Parse homeroomTime (e.g., "08:00")
+        const [hrHour, hrMin] = (homeroomTime || "08:00").split(":").map(Number);
+        
+        if (currentHours > hrHour || (currentHours === hrHour && currentMinutes > hrMin)) {
+          checkInStatus = "late";
+        }
         
         // Post attendance record to API
         const confidenceScore = Math.round((1 - minDistance) * 100);
@@ -173,10 +190,12 @@ export default function FaceDetector({
           body: JSON.stringify({
             studentId: matchedStudent.id,
             confidence: confidenceScore,
+            status: checkInStatus,
+            classroom: matchedStudent.classroom || "",
           }),
         });
 
-        onMatch(matchedStudent, parseFloat(minDistance.toFixed(2)));
+        onMatch(matchedStudent, parseFloat(minDistance.toFixed(2)), checkInStatus);
       } else {
         // Fail or no match: Return best effort or unknown state with distance for debugging
         setMatchStatus("failed");

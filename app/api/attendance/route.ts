@@ -16,7 +16,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { studentId, confidence } = body;
+    const { studentId, confidence, status, classroom } = body;
 
     if (!studentId || confidence === undefined) {
       return NextResponse.json(
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 1. Fetch student info to get details (Name, Email) to duplicate inside log
+    // 1. Fetch student info to get details (Name, Email, Classroom) to duplicate inside log
     const students = await getStudents();
     const student = students.find((s) => s.id === studentId);
 
@@ -36,12 +36,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const recordClassroom = classroom || student.classroom || "";
+    const recordStatus = status || "present";
+
     // 2. Save log record (using mutex in db.ts)
     const newRecord = await saveAttendance({
       studentId: student.id,
       studentName: student.name,
       studentEmail: student.email,
       confidence: parseFloat(confidence),
+      classroom: recordClassroom,
+      status: recordStatus as 'present' | 'late' | 'absent' | 'leave',
     });
 
     if (!newRecord) {

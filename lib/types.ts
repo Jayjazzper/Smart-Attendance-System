@@ -5,6 +5,8 @@ export interface Student {
   faceDescriptor: number[]; // 128-dimensional vector
   consentGiven: boolean;
   registeredAt: string; // ISO format string
+  classroom?: string; // e.g., "ป.4/2"
+  level?: 'kindergarten' | 'primary' | 'secondary';
 }
 
 export interface Attendance {
@@ -14,6 +16,8 @@ export interface Attendance {
   studentEmail: string;
   confidence: number; // confidence score percentage
   timestamp: string; // ISO format string
+  classroom?: string;
+  status?: 'present' | 'late' | 'absent' | 'leave';
 }
 
 export interface DatabaseState {
