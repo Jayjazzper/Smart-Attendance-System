@@ -1,6 +1,9 @@
 import Link from "next/link";
 
 export default function Home() {
+  const schoolName = process.env.NEXT_PUBLIC_SCHOOL_NAME || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)";
+  const schoolDistrict = process.env.NEXT_PUBLIC_SCHOOL_DISTRICT || "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1";
+
   return (
     <div className="flex flex-col gap-12 py-8 sm:py-12 animate-fade-in">
       {/* Hero Section */}
@@ -12,10 +15,10 @@ export default function Home() {
           ระบบเช็คชื่ออัจฉริยะด้วยใบหน้า
         </h1>
         <p className="text-sm font-bold text-blue-600">
-          โรงเรียนบ้านป่าเลา(ประชานุสรณ์)
+          {schoolName}
         </p>
         <p className="text-[10px] font-bold text-slate-400 -mt-2">
-          สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1
+          {schoolDistrict}
         </p>
         <p className="text-base text-slate-500 font-medium sm:text-lg leading-relaxed mt-2">
           นวัตกรรมเว็บแอปพลิเคชันลงเวลาเรียนผ่านเว็บแคมด้วยเทคโนโลยีปัญญาประดิษฐ์ (Client-Side Face AI) ปลอดภัย ราบรื่น และรันแบบออฟไลน์ได้ 100%

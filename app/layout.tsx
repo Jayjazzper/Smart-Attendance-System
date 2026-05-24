@@ -23,6 +23,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const schoolName = process.env.NEXT_PUBLIC_SCHOOL_NAME || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)";
+  const schoolDistrict = process.env.NEXT_PUBLIC_SCHOOL_DISTRICT || "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1";
+
   return (
     <html
       lang="th"
@@ -57,8 +60,8 @@ export default function RootLayout({
                   <span className="text-base font-bold tracking-tight text-slate-900 leading-tight">
                     Smart Attendance
                   </span>
-                  <span className="text-[9px] font-bold text-blue-600 truncate max-w-[180px]" title="โรงเรียนบ้านป่าเลา(ประชานุสรณ์)">
-                    โรงเรียนบ้านป่าเลา(ประชานุสรณ์)
+                  <span className="text-[9px] font-bold text-blue-600 truncate max-w-[180px]" title={schoolName}>
+                    {schoolName}
                   </span>
                 </div>
               </Link>
@@ -166,8 +169,8 @@ export default function RootLayout({
 
         {/* Footer */}
         <footer className="w-full border-t border-slate-100 bg-white py-6 mt-12 text-center text-xs text-slate-400 font-semibold flex flex-col gap-1">
-          <p>© 2026 Smart Attendance System. โรงเรียนบ้านป่าเลา(ประชานุสรณ์)</p>
-          <p className="text-[10px] text-slate-400/80">สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1</p>
+          <p>© 2026 Smart Attendance System. {schoolName}</p>
+          <p className="text-[10px] text-slate-400/80">{schoolDistrict}</p>
         </footer>
       </body>
     </html>

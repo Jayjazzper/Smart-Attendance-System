@@ -31,6 +31,7 @@ interface DashboardMetrics {
 }
 
 export default function DashboardPage() {
+  const schoolName = process.env.NEXT_PUBLIC_SCHOOL_NAME || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)";
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
@@ -194,7 +195,7 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700">
-                  โรงเรียนบ้านป่าเลา(ประชานุสรณ์)
+                  {schoolName}
                 </span>
               </div>
               <TrendChart data={metrics.trendData} />

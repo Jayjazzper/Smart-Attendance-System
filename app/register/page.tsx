@@ -145,7 +145,7 @@ export default function RegisterPage() {
                   type="email"
                   id="email"
                   name="email"
-                  placeholder="เช่น student@university.ac.th"
+                  placeholder="เช่น student@school.ac.th"
                   value={formData.email}
                   onChange={handleChange}
                   disabled={status === "capturing" || status === "scanning" || status === "success"}
