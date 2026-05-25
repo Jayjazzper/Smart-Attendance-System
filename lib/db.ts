@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { Student, Attendance, LeaveRequest } from './types';
+import { Student, Attendance, LeaveRequest, Teacher } from './types';
 
 // Paths to JSON files
 const DATA_DIR = path.join(process.cwd(), 'data');
@@ -94,7 +94,12 @@ export async function getStudents(): Promise<Student[]> {
     try {
       const res = await callGoogleScript('getStudents');
       if (res && res.success) {
-        return res.students || [];
+        return (res.students || []).filter((s: any) => 
+          s.id && 
+          s.id.toLowerCase() !== "id" && 
+          s.id.toLowerCase() !== "รหัส" &&
+          s.name.toLowerCase() !== "name"
+        );
       }
     } catch (e) {
       console.warn('Fallback to local JSON storage for getStudents due to API error:', e);
@@ -291,7 +296,11 @@ export async function getAttendance(): Promise<Attendance[]> {
     try {
       const res = await callGoogleScript('getAttendance');
       if (res && res.success) {
-        return res.attendance || [];
+        return (res.attendance || []).filter((a: any) => 
+          a.id && 
+          a.id.toLowerCase() !== "id" && 
+          a.studentId.toLowerCase() !== "studentid"
+        );
       }
     } catch (e) {
       console.warn('Fallback to local JSON storage for getAttendance due to API error:', e);
@@ -723,6 +732,8 @@ export async function seedMockData(): Promise<boolean> {
 
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 
+import { hashPassword } from './auth';
+
 export interface ClassroomSetting {
   lineToken?: string;
 }
@@ -738,16 +749,40 @@ export interface SystemSettings {
   enableAutoSummary?: boolean; // Enable automatic daily LINE summary
   summaryTime?: string; // Time to send daily summary, e.g., "08:30"
   lastSummarySentDate?: Record<string, string>; // Map of classroom -> last sent YYYY-MM-DD
+  teachers?: Teacher[];
+}
+
+function ensureDefaultAdmin(settings: SystemSettings): { settings: SystemSettings; changed: boolean } {
+  let changed = false;
+  if (!settings.teachers) {
+    settings.teachers = [];
+    changed = true;
+  }
+  if (settings.teachers.length === 0) {
+    settings.teachers.push({
+      username: "admin",
+      passwordHash: hashPassword("admin1234"),
+      name: "ผู้ดูแลระบบกลาง",
+      email: "admin@school.mail",
+      classrooms: [],
+      role: "admin",
+      createdAt: new Date().toISOString()
+    });
+    changed = true;
+  }
+  return { settings, changed };
 }
 
 export async function getSettings(): Promise<SystemSettings> {
+  let rawSettings: SystemSettings | null = null;
+  
   // 1. Try Google Sheets Web App if active
   if (isGoogleSheetsActive()) {
     try {
       const res = await callGoogleScript('getSettings');
       if (res && res.success && res.settings) {
         const parsed = res.settings;
-        return {
+        rawSettings = {
           classrooms: parsed.classrooms || {},
           lineChannelAccessToken: parsed.lineChannelAccessToken || "",
           teacherPasscode: parsed.teacherPasscode || "1234",
@@ -757,7 +792,8 @@ export async function getSettings(): Promise<SystemSettings> {
           schoolLogo: parsed.schoolLogo || "",
           enableAutoSummary: parsed.enableAutoSummary ?? false,
           summaryTime: parsed.summaryTime || "08:30",
-          lastSummarySentDate: parsed.lastSummarySentDate || {}
+          lastSummarySentDate: parsed.lastSummarySentDate || {},
+          teachers: parsed.teachers || []
         };
       }
     } catch (e) {
@@ -766,53 +802,66 @@ export async function getSettings(): Promise<SystemSettings> {
   }
 
   // 2. Fallback to local files
-  const release = await dbMutex.acquire();
-  try {
-    await ensureDbExists();
+  if (!rawSettings) {
+    const release = await dbMutex.acquire();
     try {
-      await fs.access(SETTINGS_FILE);
-    } catch {
-      await fs.writeFile(SETTINGS_FILE, JSON.stringify({ 
-        classrooms: {}, 
-        lineChannelAccessToken: "", 
-        teacherPasscode: "1234", 
+      await ensureDbExists();
+      try {
+        await fs.access(SETTINGS_FILE);
+      } catch {
+        await fs.writeFile(SETTINGS_FILE, JSON.stringify({ 
+          classrooms: {}, 
+          lineChannelAccessToken: "", 
+          teacherPasscode: "1234", 
+          adminPasscode: "1234",
+          enableAutoSummary: false,
+          summaryTime: "08:30",
+          lastSummarySentDate: {},
+          teachers: []
+        }, null, 2));
+      }
+      const data = await fs.readFile(SETTINGS_FILE, 'utf-8');
+      const parsed = JSON.parse(data) as SystemSettings;
+      rawSettings = {
+        classrooms: parsed.classrooms || {},
+        lineChannelAccessToken: parsed.lineChannelAccessToken || "",
+        teacherPasscode: parsed.teacherPasscode || "1234",
+        adminPasscode: parsed.adminPasscode || "1234",
+        schoolName: parsed.schoolName || process.env.NEXT_PUBLIC_SCHOOL_NAME || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)",
+        schoolDistrict: parsed.schoolDistrict || process.env.NEXT_PUBLIC_SCHOOL_DISTRICT || "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1",
+        schoolLogo: parsed.schoolLogo || "",
+        enableAutoSummary: parsed.enableAutoSummary ?? false,
+        summaryTime: parsed.summaryTime || "08:30",
+        lastSummarySentDate: parsed.lastSummarySentDate || {},
+        teachers: parsed.teachers || []
+      };
+    } catch (error) {
+      console.error('Error reading settings:', error);
+      rawSettings = {
+        classrooms: {},
+        lineChannelAccessToken: "",
+        teacherPasscode: "1234",
         adminPasscode: "1234",
+        schoolName: process.env.NEXT_PUBLIC_SCHOOL_NAME || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)",
+        schoolDistrict: process.env.NEXT_PUBLIC_SCHOOL_DISTRICT || "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1",
+        schoolLogo: "",
         enableAutoSummary: false,
         summaryTime: "08:30",
-        lastSummarySentDate: {}
-      }, null, 2));
+        lastSummarySentDate: {},
+        teachers: []
+      };
+    } finally {
+      release();
     }
-    const data = await fs.readFile(SETTINGS_FILE, 'utf-8');
-    const parsed = JSON.parse(data) as SystemSettings;
-    return {
-      classrooms: parsed.classrooms || {},
-      lineChannelAccessToken: parsed.lineChannelAccessToken || "",
-      teacherPasscode: parsed.teacherPasscode || "1234",
-      adminPasscode: parsed.adminPasscode || "1234",
-      schoolName: parsed.schoolName || process.env.NEXT_PUBLIC_SCHOOL_NAME || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)",
-      schoolDistrict: parsed.schoolDistrict || process.env.NEXT_PUBLIC_SCHOOL_DISTRICT || "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1",
-      schoolLogo: parsed.schoolLogo || "",
-      enableAutoSummary: parsed.enableAutoSummary ?? false,
-      summaryTime: parsed.summaryTime || "08:30",
-      lastSummarySentDate: parsed.lastSummarySentDate || {}
-    };
-  } catch (error) {
-    console.error('Error reading settings:', error);
-    return {
-      classrooms: {},
-      lineChannelAccessToken: "",
-      teacherPasscode: "1234",
-      adminPasscode: "1234",
-      schoolName: process.env.NEXT_PUBLIC_SCHOOL_NAME || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)",
-      schoolDistrict: process.env.NEXT_PUBLIC_SCHOOL_DISTRICT || "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1",
-      schoolLogo: "",
-      enableAutoSummary: false,
-      summaryTime: "08:30",
-      lastSummarySentDate: {}
-    };
-  } finally {
-    release();
   }
+
+  // Ensure default admin exists
+  const { settings: finalSettings, changed } = ensureDefaultAdmin(rawSettings);
+  if (changed) {
+    saveSettings(finalSettings).catch(err => console.error("Failed to auto-save default admin:", err));
+  }
+
+  return finalSettings;
 }
 
 export async function saveSettings(settings: SystemSettings): Promise<boolean> {
@@ -847,6 +896,61 @@ export async function saveSettings(settings: SystemSettings): Promise<boolean> {
   } finally {
     release();
   }
+}
+
+// --- Teacher Management Operations ---
+
+export async function getTeachers(): Promise<Teacher[]> {
+  const settings = await getSettings();
+  return settings.teachers || [];
+}
+
+export async function saveTeacher(teacher: Teacher): Promise<boolean> {
+  const settings = await getSettings();
+  const teachers = settings.teachers || [];
+  
+  if (teachers.some(t => t.username.toLowerCase() === teacher.username.toLowerCase())) {
+    return false; // username exists
+  }
+  
+  teachers.push(teacher);
+  settings.teachers = teachers;
+  return await saveSettings(settings);
+}
+
+export async function updateTeacherAccount(
+  username: string, 
+  data: Partial<Omit<Teacher, 'username' | 'createdAt'>>
+): Promise<boolean> {
+  const settings = await getSettings();
+  const teachers = settings.teachers || [];
+  
+  const index = teachers.findIndex(t => t.username.toLowerCase() === username.toLowerCase());
+  if (index === -1) return false;
+  
+  const current = teachers[index];
+  teachers[index] = {
+    ...current,
+    name: data.name !== undefined ? data.name : current.name,
+    email: data.email !== undefined ? data.email : current.email,
+    classrooms: data.classrooms !== undefined ? data.classrooms : current.classrooms,
+    role: data.role !== undefined ? data.role : current.role,
+    passwordHash: data.passwordHash !== undefined ? data.passwordHash : current.passwordHash
+  };
+  
+  settings.teachers = teachers;
+  return await saveSettings(settings);
+}
+
+export async function deleteTeacher(username: string): Promise<boolean> {
+  const settings = await getSettings();
+  const teachers = settings.teachers || [];
+  
+  const filtered = teachers.filter(t => t.username.toLowerCase() !== username.toLowerCase());
+  if (teachers.length === filtered.length) return false; // not found
+  
+  settings.teachers = filtered;
+  return await saveSettings(settings);
 }
 
 // Get all leave requests

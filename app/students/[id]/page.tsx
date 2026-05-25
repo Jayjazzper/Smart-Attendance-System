@@ -92,10 +92,13 @@ export default function EditStudentPage() {
     parentLineId: "",
   });
   const [loading, setLoading] = useState(true);
+  const [loadingUser, setLoadingUser] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [originalClassroom, setOriginalClassroom] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
 
-  // 1. Fetch live student info on load
+  // 1. Fetch live student info and current user session on load
   useEffect(() => {
     async function loadStudentData() {
       try {
@@ -103,6 +106,7 @@ export default function EditStudentPage() {
         if (response.ok) {
           const data = await response.json();
           const student = data.student;
+          setOriginalClassroom(student.classroom || "");
           const parsed = parseClassroomString(student.classroom || "");
           setFormData({
             id: student.id,
@@ -125,9 +129,27 @@ export default function EditStudentPage() {
         setLoading(false);
       }
     }
+    
+    async function loadCurrentUser() {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.loggedIn && data.user) {
+            setCurrentUser(data.user);
+          }
+        }
+      } catch (e) {
+        console.error("Error loading user profile:", e);
+      } finally {
+        setLoadingUser(false);
+      }
+    }
+
     if (studentId) {
       loadStudentData();
     }
+    loadCurrentUser();
   }, [studentId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -151,6 +173,14 @@ export default function EditStudentPage() {
   const handleUpdateStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim() || !formData.email.trim()) return;
+
+    // Frontend authorization check for classroom transfer
+    const newClassroom = getAbbreviatedClassroom(formData.grade, formData.room);
+    if (currentUser?.role === "teacher" && !currentUser.classrooms?.includes(newClassroom)) {
+      setErrorMessage("คุณไม่มีสิทธิ์ย้ายนักเรียนไปยังห้องเรียนที่คุณไม่ได้ดูแล");
+      setStatus("error");
+      return;
+    }
 
     setStatus("saving");
     setErrorMessage("");
@@ -185,8 +215,33 @@ export default function EditStudentPage() {
     }
   };
 
+  const isAdminValidated = typeof window !== "undefined" && localStorage.getItem("adminValidated") === "true";
+  const isAuthorized = isAdminValidated || (currentUser && (currentUser.role === "admin" || (currentUser.role === "teacher" && originalClassroom && currentUser.classrooms?.includes(originalClassroom))));
+
+  if (!loading && !loadingUser && !isAuthorized) {
+    return (
+      <AdminGuard allowTeacher={true}>
+        <div className="flex flex-col gap-6 py-6 max-w-xl mx-auto w-full text-center">
+          <div className="rounded-2xl border border-red-100 bg-red-50 p-6 flex flex-col items-center gap-4 dark:bg-red-950/20 dark:border-red-900/40 mt-8">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <h2 className="text-lg font-bold text-red-800 dark:text-red-400">ปฏิเสธการเข้าถึง (Access Denied)</h2>
+            <p className="text-xs text-red-700 dark:text-red-450 font-medium">
+              คุณไม่มีสิทธิ์เข้าถึงหรือแก้ไขข้อมูลนักเรียนในห้องเรียนนี้ ({originalClassroom || "ไม่มีระบุ"})
+            </p>
+            <Link
+              href="/students"
+              className="inline-flex items-center justify-center rounded-xl bg-red-600 hover:bg-red-700 px-4 py-2 text-xs font-bold text-white transition-colors"
+            >
+              กลับไปหน้ารายชื่อนักเรียน
+            </Link>
+          </div>
+        </div>
+      </AdminGuard>
+    );
+  }
+
   return (
-    <AdminGuard>
+    <AdminGuard allowTeacher={true}>
       <div className="flex flex-col gap-6 py-6 animate-fade-in max-w-xl mx-auto w-full">
       {/* Title */}
       <div className="flex items-center gap-3">

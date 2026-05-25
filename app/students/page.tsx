@@ -19,6 +19,7 @@ export default function StudentsPage() {
     schoolDistrict: "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1",
     schoolLogo: ""
   });
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   // 1. Fetch live students from API
   const fetchStudents = async () => {
@@ -61,6 +62,19 @@ export default function StudentsPage() {
       } catch (e) {}
     };
     fetchSchoolSettings();
+
+    const fetchCurrentUser = async () => {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.loggedIn && data.user) {
+            setCurrentUser(data.user);
+          }
+        }
+      } catch (e) {}
+    };
+    fetchCurrentUser();
   }, []);
 
   // Search and Level filter
@@ -100,8 +114,20 @@ export default function StudentsPage() {
     }
   };
 
+  const checkCanEdit = (studentClassroom?: string) => {
+    if (typeof window !== "undefined" && localStorage.getItem("adminValidated") === "true") {
+      return true;
+    }
+    if (!currentUser) return false;
+    if (currentUser.role === "admin") return true;
+    if (currentUser.role === "teacher") {
+      return studentClassroom ? currentUser.classrooms?.includes(studentClassroom) : false;
+    }
+    return false;
+  };
+
   return (
-    <AdminGuard>
+    <AdminGuard allowTeacher={true}>
       <div className="flex flex-col gap-6 py-6 animate-fade-in relative text-slate-900 dark:text-slate-100">
       {/* Upper header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -248,18 +274,22 @@ export default function StudentsPage() {
                           >
                             บัตรนักเรียน
                           </button>
-                          <Link
-                            href={`/students/${student.id}`}
-                            className="inline-flex h-7 px-2.5 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors font-bold text-[10px]"
-                          >
-                            แก้ไข
-                          </Link>
-                          <button
-                            onClick={() => setShowDeleteConfirm(student.id)}
-                            className="inline-flex h-7 px-2.5 items-center justify-center rounded-lg bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors font-bold text-[10px] cursor-pointer"
-                          >
-                            ลบ
-                          </button>
+                          {checkCanEdit(student.classroom) && (
+                            <>
+                              <Link
+                                href={`/students/${student.id}`}
+                                className="inline-flex h-7 px-2.5 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-colors font-bold text-[10px]"
+                              >
+                                แก้ไข
+                              </Link>
+                              <button
+                                onClick={() => setShowDeleteConfirm(student.id)}
+                                className="inline-flex h-7 px-2.5 items-center justify-center rounded-lg bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors font-bold text-[10px] cursor-pointer"
+                              >
+                                ลบ
+                              </button>
+                            </>
+                          )}
                         </td>
                       </tr>
                     ))

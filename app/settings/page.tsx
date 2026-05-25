@@ -142,6 +142,135 @@ export default function SettingsPage() {
   const [backupOverwrite, setBackupOverwrite] = useState(false);
   const [backupStatusMessage, setBackupStatusMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
+  // Teacher Accounts state
+  const [teachersList, setTeachersList] = useState<any[]>([]);
+  const [isTeachersLoading, setIsTeachersLoading] = useState(false);
+  const [editingTeacher, setEditingTeacher] = useState<any | null>(null);
+  const [teacherForm, setTeacherForm] = useState({
+    username: "",
+    password: "",
+    name: "",
+    email: "",
+    role: "teacher",
+    classrooms: [] as string[]
+  });
+  const [teacherStatusMsg, setTeacherStatusMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  const [customClass, setCustomClass] = useState("");
+
+  const fetchTeachers = async () => {
+    setIsTeachersLoading(true);
+    try {
+      const res = await fetch("/api/settings/teachers");
+      if (res.ok) {
+        const data = await res.json();
+        setTeachersList(data.teachers || []);
+      }
+    } catch (e) {
+      console.error("Failed to load teachers:", e);
+    } finally {
+      setIsTeachersLoading(false);
+    }
+  };
+
+  const handleSaveTeacher = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTeacherStatusMsg(null);
+    
+    if (editingTeacher) {
+      try {
+        const res = await fetch("/api/settings/teachers", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            username: teacherForm.username,
+            password: teacherForm.password || undefined,
+            name: teacherForm.name,
+            email: teacherForm.email,
+            role: teacherForm.role,
+            classrooms: teacherForm.classrooms
+          })
+        });
+        if (res.ok) {
+          setTeacherStatusMsg({ text: "✓ แก้ไขข้อมูลคุณครูสำเร็จ", type: "success" });
+          setEditingTeacher(null);
+          setTeacherForm({ username: "", password: "", name: "", email: "", role: "teacher", classrooms: [] });
+          fetchTeachers();
+        } else {
+          const data = await res.json();
+          setTeacherStatusMsg({ text: data.error || "เกิดข้อผิดพลาดในการแก้ไขข้อมูล", type: "error" });
+        }
+      } catch (err) {
+        setTeacherStatusMsg({ text: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", type: "error" });
+      }
+    } else {
+      if (!teacherForm.username || !teacherForm.password || !teacherForm.name || !teacherForm.email) {
+        setTeacherStatusMsg({ text: "กรุณากรอกข้อมูลให้ครบถ้วนเพื่อสร้างบัญชี", type: "error" });
+        return;
+      }
+      try {
+        const res = await fetch("/api/settings/teachers", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(teacherForm)
+        });
+        if (res.ok) {
+          setTeacherStatusMsg({ text: "✓ สร้างบัญชีคุณครูสำเร็จ", type: "success" });
+          setTeacherForm({ username: "", password: "", name: "", email: "", role: "teacher", classrooms: [] });
+          fetchTeachers();
+        } else {
+          const data = await res.json();
+          setTeacherStatusMsg({ text: data.error || "ชื่อผู้ใช้นี้มีอยู่แล้วหรือข้อมูลไม่ถูกต้อง", type: "error" });
+        }
+      } catch (err) {
+        setTeacherStatusMsg({ text: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", type: "error" });
+      }
+    }
+  };
+
+  const handleDeleteTeacher = async (usernameToDelete: string) => {
+    if (!confirm(`คุณแน่ใจหรือไม่ที่จะลบบัญชีผู้ใช้ครู: ${usernameToDelete}?`)) return;
+    setTeacherStatusMsg(null);
+    try {
+      const res = await fetch(`/api/settings/teachers?username=${usernameToDelete}`, {
+        method: "DELETE"
+      });
+      if (res.ok) {
+        setTeacherStatusMsg({ text: "✓ ลบบัญชีคุณครูเรียบร้อยแล้ว", type: "success" });
+        fetchTeachers();
+      } else {
+        const data = await res.json();
+        setTeacherStatusMsg({ text: data.error || "ไม่สามารถลบบัญชีนี้ได้", type: "error" });
+      }
+    } catch (err) {
+      setTeacherStatusMsg({ text: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", type: "error" });
+    }
+  };
+
+  const handleClassroomCheckboxChange = (cls: string, checked: boolean) => {
+    if (checked) {
+      setTeacherForm(prev => ({
+        ...prev,
+        classrooms: [...prev.classrooms, cls]
+      }));
+    } else {
+      setTeacherForm(prev => ({
+        ...prev,
+        classrooms: prev.classrooms.filter(c => c !== cls)
+      }));
+    }
+  };
+
+  const handleAddCustomClass = () => {
+    const trimmed = customClass.trim();
+    if (trimmed && !teacherForm.classrooms.includes(trimmed)) {
+      setTeacherForm(prev => ({
+        ...prev,
+        classrooms: [...prev.classrooms, trimmed]
+      }));
+      setCustomClass("");
+    }
+  };
+
   // 1. Fetch Students and current settings
   const fetchData = async () => {
     try {
@@ -167,6 +296,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     fetchData();
+    fetchTeachers();
     const savedTestId = localStorage.getItem("testPushUserId");
     if (savedTestId) setTestPushUserId(savedTestId);
   }, []);
@@ -950,6 +1080,253 @@ export default function SettingsPage() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Teacher Accounts Management Card */}
+          <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm flex flex-col gap-6 text-slate-900 dark:text-slate-100">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                จัดการบัญชีผู้ใช้คุณครูประจำชั้น (Teacher Accounts)
+              </h3>
+              <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+                สร้างและกำหนดสิทธิ์ผู้ใช้งานให้แก่คุณครูประจำชั้น เพื่อกระจายสิทธิ์การดูแลและแก้ไขข้อมูลนักเรียนแยกรายห้องเรียน
+              </p>
+            </div>
+
+            <div className="grid gap-8 md:grid-cols-12 items-start">
+              {/* Teachers List Column (Left) */}
+              <div className="md:col-span-7 flex flex-col gap-4">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">บัญชีครูทั้งหมดในระบบ ({teachersList.length})</span>
+                
+                {isTeachersLoading ? (
+                  <div className="text-center py-6 text-slate-400 text-xs font-bold">กำลังโหลดรายชื่อคุณครู...</div>
+                ) : teachersList.length === 0 ? (
+                  <div className="text-center py-10 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-100 dark:border-slate-800 text-slate-400 text-xs font-bold">
+                    ยังไม่มีบัญชีคุณครูในระบบ
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3 max-h-[450px] overflow-y-auto pr-1">
+                    {teachersList.map((t) => (
+                      <div 
+                        key={t.username} 
+                        className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 transition-all ${
+                          editingTeacher?.username === t.username
+                            ? "bg-blue-50/50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900/50"
+                            : "bg-slate-50/50 dark:bg-slate-950/20 border-slate-150 dark:border-slate-800/80"
+                        }`}
+                      >
+                        <div className="flex flex-col gap-1 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-black text-slate-800 dark:text-white">{t.name}</span>
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${
+                              t.role === "admin"
+                                ? "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-400"
+                                : "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400"
+                            }`}>
+                              {t.role}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-semibold">ชื่อผู้ใช้: @{t.username} | {t.email}</span>
+                          <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                            <span className="text-[9px] font-bold text-slate-500">ห้องที่ดูแล:</span>
+                            {t.role === "admin" ? (
+                              <span className="text-[9px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 rounded">ทุกห้องเรียน (Admin)</span>
+                            ) : t.classrooms && t.classrooms.length > 0 ? (
+                              t.classrooms.map((c: string) => (
+                                <span key={c} className="text-[9px] font-bold text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 px-1.5 py-0.5 rounded">{c}</span>
+                              ))
+                            ) : (
+                              <span className="text-[9px] font-semibold text-slate-400 italic font-medium">ไม่ได้เลือกห้องเรียน</span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-1.5 self-end sm:self-auto">
+                          <button
+                            onClick={() => {
+                              setEditingTeacher(t);
+                              setTeacherForm({
+                                username: t.username,
+                                password: "",
+                                name: t.name,
+                                email: t.email,
+                                role: t.role,
+                                classrooms: t.classrooms || []
+                              });
+                              setTeacherStatusMsg(null);
+                            }}
+                            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 text-slate-500 transition-colors cursor-pointer"
+                            title="แก้ไขบัญชี"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTeacher(t.username)}
+                            className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-rose-50 dark:hover:bg-rose-950/20 hover:text-rose-600 dark:hover:text-rose-400 text-slate-500 transition-colors cursor-pointer"
+                            title="ลบบัญชี"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Teacher Form Column (Right) */}
+              <form onSubmit={handleSaveTeacher} className="md:col-span-5 rounded-xl border border-slate-100 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-950/30 flex flex-col gap-4">
+                <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  {editingTeacher ? `แก้ไขข้อมูล: @${editingTeacher.username}` : "สร้างบัญชีคุณครูใหม่"}
+                </span>
+
+                {/* Username */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-slate-600 dark:text-slate-400">ชื่อผู้ใช้ (Username)</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น somchai_r..."
+                    value={teacherForm.username}
+                    onChange={(e) => setTeacherForm(prev => ({ ...prev, username: e.target.value }))}
+                    disabled={!!editingTeacher}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 disabled:bg-slate-100 dark:disabled:bg-slate-900 focus:outline-none focus:border-blue-500"
+                    required
+                  />
+                </div>
+
+                {/* Password */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-slate-600 dark:text-slate-400">
+                    รหัสผ่าน (Password) {editingTeacher && "(ปล่อยว่างไว้หากไม่ต้องการเปลี่ยน)"}
+                  </label>
+                  <input
+                    type="password"
+                    placeholder={editingTeacher ? "เปลี่ยนรหัสผ่านใหม่..." : "ระบุรหัสผ่าน..."}
+                    value={teacherForm.password}
+                    onChange={(e) => setTeacherForm(prev => ({ ...prev, password: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-350 focus:outline-none focus:border-blue-500"
+                    required={!editingTeacher}
+                  />
+                </div>
+
+                {/* Full Name */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-slate-600 dark:text-slate-400">ชื่อ-นามสกุลครู (Full Name)</label>
+                  <input
+                    type="text"
+                    placeholder="เช่น ครูสมชาย รักดี..."
+                    value={teacherForm.name}
+                    onChange={(e) => setTeacherForm(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-350 focus:outline-none focus:border-blue-500"
+                    required
+                  />
+                </div>
+
+                {/* Email */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-slate-600 dark:text-slate-400">อีเมล (Email)</label>
+                  <input
+                    type="email"
+                    placeholder="เช่น somchai@school.mail..."
+                    value={teacherForm.email}
+                    onChange={(e) => setTeacherForm(prev => ({ ...prev, email: e.target.value }))}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-350 focus:outline-none focus:border-blue-500"
+                    required
+                  />
+                </div>
+
+                {/* Role */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-bold text-slate-600 dark:text-slate-400">ระดับสิทธิ์ (Role)</label>
+                  <select
+                    value={teacherForm.role}
+                    onChange={(e) => setTeacherForm(prev => ({ ...prev, role: e.target.value as any }))}
+                    className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-1.5 text-xs font-bold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-blue-500 cursor-pointer"
+                  >
+                    <option value="teacher">ครูประจำชั้น (Teacher)</option>
+                    <option value="admin">ผู้ดูแลระบบกลาง (Admin)</option>
+                  </select>
+                </div>
+
+                {/* Classrooms List Checkboxes (Only applicable if role is teacher) */}
+                {teacherForm.role === "teacher" && (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] font-bold text-slate-600 dark:text-slate-400">เลือกห้องเรียนที่รับผิดชอบ</label>
+                    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-3 max-h-[140px] overflow-y-auto flex flex-col gap-2">
+                      {classroomsList.length === 0 ? (
+                        <span className="text-[10px] text-slate-400 italic">ยังไม่มีเด็กนักเรียนลงทะเบียนในระบบเพื่อสร้างห้องเรียน</span>
+                      ) : (
+                        classroomsList.map(cls => (
+                          <label key={cls} className="flex items-center gap-2 text-xs font-bold text-slate-750 dark:text-slate-300 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={teacherForm.classrooms.includes(cls)}
+                              onChange={(e) => handleClassroomCheckboxChange(cls, e.target.checked)}
+                              className="rounded border-slate-300 dark:border-slate-700 text-blue-600 focus:ring-0"
+                            />
+                            <span>ห้องเรียน {cls}</span>
+                          </label>
+                        ))
+                      )}
+                    </div>
+                    
+                    {/* Add Custom Classroom Name */}
+                    <div className="flex gap-1.5 items-center mt-1">
+                      <input
+                        type="text"
+                        placeholder="เพิ่มห้องเรียนอื่น..."
+                        value={customClass}
+                        onChange={(e) => setCustomClass(e.target.value)}
+                        className="flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2 py-1.5 text-[10px] font-semibold text-slate-700 dark:text-slate-300 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddCustomClass}
+                        className="bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg text-[10px] font-black border border-blue-100 dark:border-blue-900/50 cursor-pointer"
+                      >
+                        เพิ่มห้อง
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Status message */}
+                {teacherStatusMsg && (
+                  <div className={`rounded-xl px-3 py-2 text-center text-xs font-semibold border ${
+                    teacherStatusMsg.type === "success"
+                      ? "bg-emerald-50 border-emerald-100 text-emerald-800"
+                      : "bg-red-50 border-red-100 text-red-800"
+                  }`}>
+                    {teacherStatusMsg.text}
+                  </div>
+                )}
+
+                {/* Buttons */}
+                <div className="flex gap-2">
+                  {editingTeacher && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingTeacher(null);
+                        setTeacherForm({ username: "", password: "", name: "", email: "", role: "teacher", classrooms: [] });
+                        setTeacherStatusMsg(null);
+                      }}
+                      className="flex-1 inline-flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 transition-all cursor-pointer h-9.5"
+                    >
+                      ยกเลิกแก้ไข
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    className="flex-1 inline-flex items-center justify-center rounded-xl bg-blue-600 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition-all cursor-pointer h-9.5"
+                  >
+                    {editingTeacher ? "บันทึกการแก้ไข" : "สร้างบัญชีครู"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
 

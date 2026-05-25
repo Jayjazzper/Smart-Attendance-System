@@ -16,15 +16,16 @@ function doPost(e) {
     var studentSheet = ss.getSheetByName("students");
     if (!studentSheet) {
       studentSheet = ss.insertSheet("students");
-      studentSheet.appendRow(["id", "name", "email", "faceDescriptor", "classroom", "level"]);
+      studentSheet.appendRow(["id", "name", "email", "faceDescriptor", "consentGiven", "registeredAt", "classroom", "level", "parentLineId"]);
     } else {
-      // Ensure headers exist for new columns (upgrade existing sheets)
-      var headers = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 6).getValues()[0];
-      if (headers.indexOf("classroom") === -1) {
-        studentSheet.getRange(1, 5).setValue("classroom");
-      }
-      if (headers.indexOf("level") === -1) {
-        studentSheet.getRange(1, 6).setValue("level");
+      // Ensure headers exist for all columns (upgrade existing sheets dynamically)
+      var studentHeaders = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 9).getValues()[0];
+      var requiredStudentHeaders = ["id", "name", "email", "faceDescriptor", "consentGiven", "registeredAt", "classroom", "level", "parentLineId"];
+      for (var h = 0; h < requiredStudentHeaders.length; h++) {
+        var hName = requiredStudentHeaders[h];
+        if (studentHeaders.indexOf(hName) === -1) {
+          studentSheet.getRange(1, studentSheet.getLastColumn() + 1).setValue(hName);
+        }
       }
     }
     
@@ -33,42 +34,54 @@ function doPost(e) {
       attendanceSheet = ss.insertSheet("attendance");
       attendanceSheet.appendRow(["id", "studentId", "studentName", "studentEmail", "timestamp", "confidence", "classroom", "status", "temperature", "healthStatus"]);
     } else {
-      // Ensure headers exist for new columns (upgrade existing sheets)
-      var headers = attendanceSheet.getRange(1, 1, 1, attendanceSheet.getLastColumn() || 10).getValues()[0];
-      if (headers.indexOf("classroom") === -1) {
-        attendanceSheet.getRange(1, 7).setValue("classroom");
-      }
-      if (headers.indexOf("status") === -1) {
-        attendanceSheet.getRange(1, 8).setValue("status");
-      }
-      if (headers.indexOf("temperature") === -1) {
-        attendanceSheet.getRange(1, 9).setValue("temperature");
-      }
-      if (headers.indexOf("healthStatus") === -1) {
-        attendanceSheet.getRange(1, 10).setValue("healthStatus");
+      // Ensure headers exist for all columns (upgrade existing sheets dynamically)
+      var attHeaders = attendanceSheet.getRange(1, 1, 1, attendanceSheet.getLastColumn() || 10).getValues()[0];
+      var requiredAttHeaders = ["id", "studentId", "studentName", "studentEmail", "timestamp", "confidence", "classroom", "status", "temperature", "healthStatus"];
+      for (var h = 0; h < requiredAttHeaders.length; h++) {
+        var hName = requiredAttHeaders[h];
+        if (attHeaders.indexOf(hName) === -1) {
+          attendanceSheet.getRange(1, attendanceSheet.getLastColumn() + 1).setValue(hName);
+        }
       }
     }
     
     if (action === "getStudents") {
       var data = studentSheet.getDataRange().getValues();
+      var headers = data[0];
+      
+      var idxId = headers.indexOf("id");
+      var idxName = headers.indexOf("name");
+      var idxEmail = headers.indexOf("email");
+      var idxFaceDescriptor = headers.indexOf("faceDescriptor");
+      var idxConsentGiven = headers.indexOf("consentGiven");
+      var idxRegisteredAt = headers.indexOf("registeredAt");
+      var idxClassroom = headers.indexOf("classroom");
+      var idxLevel = headers.indexOf("level");
+      var idxParentLineId = headers.indexOf("parentLineId");
+      
       var students = [];
-      // Skip header row
+      // Skip header row and skip any duplicate header rows or literal headers
       for (var i = 1; i < data.length; i++) {
         var row = data[i];
-        if (row[0]) {
+        if (row[0] && String(row[idxId]).toLowerCase() !== "id") {
           var faceDesc = [];
-          try {
-            faceDesc = JSON.parse(row[3]);
-          } catch(e) {
-            console.error("Error parsing faceDescriptor for student " + row[0], e);
+          if (idxFaceDescriptor !== -1 && row[idxFaceDescriptor]) {
+            try {
+              faceDesc = JSON.parse(row[idxFaceDescriptor]);
+            } catch(e) {
+              console.error("Error parsing faceDescriptor for student " + row[idxId], e);
+            }
           }
           students.push({
-            id: String(row[0]),
-            name: String(row[1]),
-            email: String(row[2]),
+            id: String(row[idxId]),
+            name: idxName !== -1 ? String(row[idxName]) : "",
+            email: idxEmail !== -1 ? String(row[idxEmail]) : "",
             faceDescriptor: faceDesc,
-            classroom: row[4] ? String(row[4]) : "",
-            level: row[5] ? String(row[5]) : ""
+            consentGiven: idxConsentGiven !== -1 ? (String(row[idxConsentGiven]).toLowerCase() === "true" || row[idxConsentGiven] === true) : true,
+            registeredAt: idxRegisteredAt !== -1 ? String(row[idxRegisteredAt]) : "",
+            classroom: idxClassroom !== -1 ? String(row[idxClassroom]) : "",
+            level: idxLevel !== -1 ? String(row[idxLevel]) : "",
+            parentLineId: idxParentLineId !== -1 ? String(row[idxParentLineId]) : ""
           });
         }
       }
@@ -88,14 +101,26 @@ function doPost(e) {
       if (exists) {
         result = { success: false, error: "Student ID already exists" };
       } else {
-        studentSheet.appendRow([
-          student.id,
-          student.name,
-          student.email,
-          JSON.stringify(student.faceDescriptor),
-          student.classroom || "",
-          student.level || ""
-        ]);
+        var headers = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 9).getValues()[0];
+        var nextRow = studentSheet.getLastRow() + 1;
+        var valuesMap = {
+          "id": student.id,
+          "name": student.name,
+          "email": student.email,
+          "faceDescriptor": JSON.stringify(student.faceDescriptor),
+          "consentGiven": student.consentGiven ?? true,
+          "registeredAt": student.registeredAt || new Date().toISOString(),
+          "classroom": student.classroom || "",
+          "level": student.level || "",
+          "parentLineId": student.parentLineId || ""
+        };
+        
+        for (var c = 0; c < headers.length; c++) {
+          var header = headers[c];
+          if (valuesMap.hasOwnProperty(header)) {
+            studentSheet.getRange(nextRow, c + 1).setValue(valuesMap[header]);
+          }
+        }
         result = { success: true };
       }
       
@@ -105,28 +130,47 @@ function doPost(e) {
       var email = postData.email;
       var classroom = postData.classroom;
       var level = postData.level;
+      var parentLineId = postData.parentLineId;
       
       var data = studentSheet.getDataRange().getValues();
+      var headers = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 9).getValues()[0];
+      
+      var idxId = headers.indexOf("id");
+      var idxName = headers.indexOf("name");
+      var idxEmail = headers.indexOf("email");
+      var idxClassroom = headers.indexOf("classroom");
+      var idxLevel = headers.indexOf("level");
+      var idxParentLineId = headers.indexOf("parentLineId");
+      
       var updated = false;
       for (var i = 1; i < data.length; i++) {
-        if (String(data[i][0]) === String(id)) {
-          studentSheet.getRange(i + 1, 2).setValue(name); // Column B
-          studentSheet.getRange(i + 1, 3).setValue(email); // Column C
-          if (classroom !== undefined) studentSheet.getRange(i + 1, 5).setValue(classroom); // Column E
-          if (level !== undefined) studentSheet.getRange(i + 1, 6).setValue(level); // Column F
+        if (idxId !== -1 && String(data[i][idxId]) === String(id)) {
+          if (idxName !== -1 && name !== undefined) studentSheet.getRange(i + 1, idxName + 1).setValue(name);
+          if (idxEmail !== -1 && email !== undefined) studentSheet.getRange(i + 1, idxEmail + 1).setValue(email);
+          if (idxClassroom !== -1 && classroom !== undefined) studentSheet.getRange(i + 1, idxClassroom + 1).setValue(classroom);
+          if (idxLevel !== -1 && level !== undefined) studentSheet.getRange(i + 1, idxLevel + 1).setValue(level);
+          if (idxParentLineId !== -1 && parentLineId !== undefined) studentSheet.getRange(i + 1, idxParentLineId + 1).setValue(parentLineId);
           updated = true;
           break;
         }
       }
       
       if (updated) {
-        // Also update matching records in attendance sheet
-        var attData = attendanceSheet.getDataRange().getValues();
-        for (var j = 1; j < attData.length; j++) {
-          if (String(attData[j][1]) === String(id)) { // Column B is studentId
-            attendanceSheet.getRange(j + 1, 3).setValue(name);  // Column C is studentName
-            attendanceSheet.getRange(j + 1, 4).setValue(email); // Column D is studentEmail
-            if (classroom !== undefined) attendanceSheet.getRange(j + 1, 7).setValue(classroom); // Column G
+        // Also update matching records in attendance sheet dynamically
+        var attHeaders = attendanceSheet.getRange(1, 1, 1, attendanceSheet.getLastColumn() || 10).getValues()[0];
+        var idxAttStudentId = attHeaders.indexOf("studentId");
+        var idxAttName = attHeaders.indexOf("studentName");
+        var idxAttEmail = attHeaders.indexOf("studentEmail");
+        var idxAttClassroom = attHeaders.indexOf("classroom");
+        
+        if (idxAttStudentId !== -1) {
+          var attData = attendanceSheet.getDataRange().getValues();
+          for (var j = 1; j < attData.length; j++) {
+            if (String(attData[j][idxAttStudentId]) === String(id)) {
+              if (idxAttName !== -1 && name !== undefined) attendanceSheet.getRange(j + 1, idxAttName + 1).setValue(name);
+              if (idxAttEmail !== -1 && email !== undefined) attendanceSheet.getRange(j + 1, idxAttEmail + 1).setValue(email);
+              if (idxAttClassroom !== -1 && classroom !== undefined) attendanceSheet.getRange(j + 1, idxAttClassroom + 1).setValue(classroom);
+            }
           }
         }
         result = { success: true };
@@ -160,22 +204,35 @@ function doPost(e) {
       
     } else if (action === "getAttendance") {
       var data = attendanceSheet.getDataRange().getValues();
+      var headers = data[0];
+      
+      var idxId = headers.indexOf("id");
+      var idxStudentId = headers.indexOf("studentId");
+      var idxStudentName = headers.indexOf("studentName");
+      var idxStudentEmail = headers.indexOf("studentEmail");
+      var idxTimestamp = headers.indexOf("timestamp");
+      var idxConfidence = headers.indexOf("confidence");
+      var idxClassroom = headers.indexOf("classroom");
+      var idxStatus = headers.indexOf("status");
+      var idxTemperature = headers.indexOf("temperature");
+      var idxHealthStatus = headers.indexOf("healthStatus");
+      
       var attendance = [];
-      // Skip header row
+      // Skip header row and skip duplicate header rows or literal headers
       for (var i = 1; i < data.length; i++) {
         var row = data[i];
-        if (row[0]) {
+        if (row[0] && String(row[idxId]).toLowerCase() !== "id") {
           attendance.push({
-            id: String(row[0]),
-            studentId: String(row[1]),
-            studentName: String(row[2]),
-            studentEmail: String(row[3]),
-            timestamp: String(row[4]),
-            confidence: Number(row[5]),
-            classroom: row[6] ? String(row[6]) : "",
-            status: row[7] ? String(row[7]) : "present",
-            temperature: row[8] ? Number(row[8]) : undefined,
-            healthStatus: row[9] ? String(row[9]) : undefined
+            id: String(row[idxId]),
+            studentId: idxStudentId !== -1 ? String(row[idxStudentId]) : "",
+            studentName: idxStudentName !== -1 ? String(row[idxStudentName]) : "",
+            studentEmail: idxStudentEmail !== -1 ? String(row[idxStudentEmail]) : "",
+            timestamp: idxTimestamp !== -1 ? String(row[idxTimestamp]) : "",
+            confidence: idxConfidence !== -1 ? Number(row[idxConfidence]) : 100,
+            classroom: idxClassroom !== -1 ? String(row[idxClassroom]) : "",
+            status: idxStatus !== -1 ? String(row[idxStatus]) : "present",
+            temperature: idxTemperature !== -1 && row[idxTemperature] !== "" ? Number(row[idxTemperature]) : undefined,
+            healthStatus: idxHealthStatus !== -1 ? String(row[idxHealthStatus]) : undefined
           });
         }
       }
@@ -183,18 +240,28 @@ function doPost(e) {
       
     } else if (action === "addAttendance") {
       var record = postData.record;
-      attendanceSheet.appendRow([
-        record.id,
-        record.studentId,
-        record.studentName,
-        record.studentEmail,
-        record.timestamp,
-        Number(record.confidence),
-        record.classroom || "",
-        record.status || "present",
-        record.temperature !== undefined ? Number(record.temperature) : "",
-        record.healthStatus || ""
-      ]);
+      var headers = attendanceSheet.getRange(1, 1, 1, attendanceSheet.getLastColumn() || 10).getValues()[0];
+      var nextRow = attendanceSheet.getLastRow() + 1;
+      
+      var valuesMap = {
+        "id": record.id,
+        "studentId": record.studentId,
+        "studentName": record.studentName,
+        "studentEmail": record.studentEmail,
+        "timestamp": record.timestamp || new Date().toISOString(),
+        "confidence": record.confidence !== undefined ? Number(record.confidence) : 100,
+        "classroom": record.classroom || "",
+        "status": record.status || "present",
+        "temperature": record.temperature !== undefined && record.temperature !== "" ? Number(record.temperature) : "",
+        "healthStatus": record.healthStatus || ""
+      };
+      
+      for (var c = 0; c < headers.length; c++) {
+        var header = headers[c];
+        if (valuesMap.hasOwnProperty(header)) {
+          attendanceSheet.getRange(nextRow, c + 1).setValue(valuesMap[header]);
+        }
+      }
       result = { success: true };
       
     } else if (action === "reset") {

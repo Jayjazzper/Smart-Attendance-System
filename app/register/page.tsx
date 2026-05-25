@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import AdminGuard from "@/components/AdminGuard";
@@ -53,6 +53,36 @@ function getAbbreviatedClassroom(grade: string, room: string): string {
   return `${grade}/${roomNumber}`;
 }
 
+function parseClassroomString(classroomStr: string): { division: "kindergarten" | "primary" | "secondary"; grade: string; room: string } {
+  if (!classroomStr) return { division: "primary", grade: "ประถมศึกษาปีที่ 1", room: "ห้อง 1" };
+  const parts = classroomStr.split("/");
+  const prefixAndNum = parts[0]; // e.g. "ป.4", "ม.3", "อ.2"
+  const roomNum = parts[1] || "1"; // e.g. "2"
+  
+  let grade = "ประถมศึกษาปีที่ 1";
+  let division: "kindergarten" | "primary" | "secondary" = "primary";
+  
+  if (prefixAndNum.startsWith("อ.")) {
+    const num = prefixAndNum.replace("อ.", "");
+    grade = `อนุบาล ${num}`;
+    division = "kindergarten";
+  } else if (prefixAndNum.startsWith("ป.")) {
+    const num = prefixAndNum.replace("ป.", "");
+    grade = `ประถมศึกษาปีที่ ${num}`;
+    division = "primary";
+  } else if (prefixAndNum.startsWith("ม.")) {
+    const num = prefixAndNum.replace("ม.", "");
+    grade = `มัธยมศึกษาปีที่ ${num}`;
+    division = "secondary";
+  }
+  
+  return {
+    division,
+    grade,
+    room: `ห้อง ${roomNum}`,
+  };
+}
+
 // Load CameraCapture component with SSR disabled to prevent SSR browser-globals errors
 const CameraCapture = dynamic(() => import("@/components/CameraCapture"), {
   ssr: false,
@@ -76,6 +106,36 @@ export default function RegisterPage() {
   });
   const [status, setStatus] = useState<"idle" | "capturing" | "scanning" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
+  useEffect(() => {
+    async function loadCurrentUser() {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.loggedIn && data.user) {
+            setCurrentUser(data.user);
+            
+            // Auto select their classroom if they are a teacher
+            if (data.user.role === "teacher" && data.user.classrooms && data.user.classrooms.length > 0) {
+              const firstClass = data.user.classrooms[0];
+              const parsed = parseClassroomString(firstClass);
+              setFormData(prev => ({
+                ...prev,
+                division: parsed.division,
+                grade: parsed.grade,
+                room: parsed.room,
+              }));
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error loading user session:", e);
+      }
+    }
+    loadCurrentUser();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
@@ -167,6 +227,15 @@ export default function RegisterPage() {
       setStatus("error");
       return;
     }
+
+    const targetClass = getAbbreviatedClassroom(formData.grade, formData.room);
+    const isAdminValidated = typeof window !== "undefined" && localStorage.getItem("adminValidated") === "true";
+    if (!isAdminValidated && currentUser?.role === "teacher" && !currentUser.classrooms?.includes(targetClass)) {
+      setErrorMessage(`คุณไม่มีสิทธิ์ลงทะเบียนนักเรียนห้อง ${targetClass} (ห้องเรียนที่คุณดูแลคือ: ${currentUser.classrooms?.join(", ") || "ไม่มี"})`);
+      setStatus("error");
+      return;
+    }
+
     setErrorMessage("");
     setCapturedDescriptors([]);
     setCaptureStep(0);
@@ -174,7 +243,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <AdminGuard>
+    <AdminGuard allowTeacher={true}>
       <div className="flex flex-col gap-6 py-6 animate-fade-in">
       {/* Title */}
       <div className="flex flex-col gap-1.5">

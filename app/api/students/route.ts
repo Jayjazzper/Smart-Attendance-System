@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { decryptSession } from "@/lib/auth";
 import { getStudents, saveStudent } from "@/lib/db";
 import { Student } from "@/lib/types";
 
@@ -26,6 +28,22 @@ export async function POST(req: NextRequest) {
         { error: "ข้อมูลนักเรียนไม่ครบถ้วน หรือไม่ได้รับความยินยอม PDPA" },
         { status: 400 }
       );
+    }
+
+    // Enforce classroom limits if locked in a teacher session
+    const cookieStore = await cookies();
+    const token = cookieStore.get("teacher_session")?.value;
+    if (token) {
+      const user = decryptSession(token);
+      if (user && user.role !== "admin") {
+        const hasAccess = user.classrooms && user.classrooms.includes(classroom.trim());
+        if (!hasAccess) {
+          return NextResponse.json(
+            { error: `ระบบถูกล็อกเพื่อใช้งานสำหรับครูประจำชั้นห้อง ${user.classrooms.join(", ")} เท่านั้น คุณไม่สามารถลงทะเบียนนักเรียนห้อง ${classroom} ได้` },
+            { status: 403 }
+          );
+        }
+      }
     }
 
     const isValidDescriptor = 

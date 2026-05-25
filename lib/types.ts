@@ -43,3 +43,14 @@ export interface LeaveRequest {
   status: 'pending' | 'approved' | 'rejected';
   submittedAt: string; // ISO format string
 }
+
+export interface Teacher {
+  username: string; // login identifier
+  passwordHash: string; // PBKDF2 hashed password
+  name: string;
+  email: string;
+  classrooms: string[]; // e.g., ["ป.4/1", "ป.4/2"]
+  role: 'admin' | 'teacher';
+  createdAt: string;
+}
+
