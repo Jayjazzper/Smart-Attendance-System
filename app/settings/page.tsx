@@ -551,7 +551,7 @@ export default function SettingsPage() {
           const canvas = document.createElement("canvas");
           const ctx = canvas.getContext("2d");
           
-          const maxDim = 200; // Resize to max 200px
+          const maxDim = 120; // Resize to max 120px (more than enough for display and keeps base64 small)
           let width = img.width;
           let height = img.height;
           
@@ -571,7 +571,8 @@ export default function SettingsPage() {
           canvas.height = height;
           ctx?.drawImage(img, 0, 0, width, height);
           
-          const base64 = canvas.toDataURL("image/png");
+          // Compress using webp with 0.7 quality to significantly reduce base64 size (falls back to PNG in older browsers)
+          const base64 = canvas.toDataURL("image/webp", 0.7);
           setSettings(prev => ({ ...prev, schoolLogo: base64 }));
           setProfileStatusMessage({ text: "✓ ประมวลผลรูปภาพสำเร็จแล้ว! อย่าลืมกดปุ่มบันทึกด้านล่าง", type: "success" });
           setTimeout(() => setProfileStatusMessage(null), 3000);
