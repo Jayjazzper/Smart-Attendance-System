@@ -168,13 +168,29 @@ export default function FaceDetector({
       let minDistance = 99.0;
 
       students.forEach((student) => {
-        // Parse descriptor back to Float32Array
-        const savedDescriptor = new Float32Array(student.faceDescriptor);
-        const distance = faceapi.euclideanDistance(currentDescriptor, savedDescriptor);
-        
-        if (distance < minDistance) {
-          minDistance = distance;
-          bestMatch = student;
+        const descData = student.faceDescriptor;
+        if (!descData) return;
+
+        // Check if 2D array (multi-angle descriptors) or 1D array
+        const is2D = Array.isArray(descData[0]);
+
+        if (is2D) {
+          const descriptorsList = descData as number[][];
+          descriptorsList.forEach((dArray) => {
+            const savedDescriptor = new Float32Array(dArray);
+            const distance = faceapi.euclideanDistance(currentDescriptor, savedDescriptor);
+            if (distance < minDistance) {
+              minDistance = distance;
+              bestMatch = student;
+            }
+          });
+        } else {
+          const savedDescriptor = new Float32Array(descData as number[]);
+          const distance = faceapi.euclideanDistance(currentDescriptor, savedDescriptor);
+          if (distance < minDistance) {
+            minDistance = distance;
+            bestMatch = student;
+          }
         }
       });
 

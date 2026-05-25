@@ -28,9 +28,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!Array.isArray(faceDescriptor) || faceDescriptor.length !== 128) {
+    const isValidDescriptor = 
+      Array.isArray(faceDescriptor) && (
+        faceDescriptor.length === 128 || (
+          faceDescriptor.length > 0 && 
+          faceDescriptor.every((d: any) => Array.isArray(d) && d.length === 128)
+        )
+      );
+
+    if (!isValidDescriptor) {
       return NextResponse.json(
-        { error: "Face descriptor ต้องเป็นอาร์เรย์ตัวเลขขนาด 128 มิติ" },
+        { error: "Face descriptor ต้องเป็นอาร์เรย์ตัวเลขขนาด 128 มิติ หรือชุดของเวกเตอร์ 128 มิติ" },
         { status: 400 }
       );
     }

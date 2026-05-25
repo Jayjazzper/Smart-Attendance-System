@@ -96,38 +96,62 @@ export default function RegisterPage() {
     });
   };
 
+  const [capturedDescriptors, setCapturedDescriptors] = useState<number[][]>([]);
+  const [captureStep, setCaptureStep] = useState<number>(0);
+  const captureInstructions = [
+    "ขั้นตอนที่ 1: กรุณามองตรงไปที่กล้อง (Front Angle)",
+    "ขั้นตอนที่ 2: กรุณาเอียงใบหน้าไปทางซ้ายเล็กน้อย (Left Profile)",
+    "ขั้นตอนที่ 3: กรุณาเอียงใบหน้าไปทางขวาเล็กน้อย (Right Profile)"
+  ];
+
   // Called when camera successfully extracts a 128d face descriptor vector
   const handleFaceCaptured = async (descriptorArray: number[]) => {
-    try {
-      setStatus("scanning");
-      
-      const response = await fetch("/api/students", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: formData.id,
-          name: formData.name,
-          email: formData.email,
-          faceDescriptor: descriptorArray,
-          consentGiven: formData.consent,
-          classroom: getAbbreviatedClassroom(formData.grade, formData.room),
-          level: formData.division,
-          parentLineId: formData.parentLineId,
-        }),
-      });
+    const updatedDescriptors = [...capturedDescriptors, descriptorArray];
+    setCapturedDescriptors(updatedDescriptors);
 
-      const result = await response.json();
+    if (captureStep < 2) {
+      // Transition to next angle and prompt the camera to restart
+      setCaptureStep(captureStep + 1);
+      setStatus("idle");
+    } else {
+      // Completed all 3 angles, submit to API
+      try {
+        setStatus("scanning");
+        
+        const response = await fetch("/api/students", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: formData.id,
+            name: formData.name,
+            email: formData.email,
+            faceDescriptor: updatedDescriptors,
+            consentGiven: formData.consent,
+            classroom: getAbbreviatedClassroom(formData.grade, formData.room),
+            level: formData.division,
+            parentLineId: formData.parentLineId,
+          }),
+        });
 
-      if (response.ok) {
-        setStatus("success");
-      } else {
+        const result = await response.json();
+
+        if (response.ok) {
+          setStatus("success");
+          setCapturedDescriptors([]);
+          setCaptureStep(0);
+        } else {
+          setStatus("error");
+          setErrorMessage(result.error || "เกิดข้อผิดพลาดในการลงทะเบียนใบหน้า");
+          setCapturedDescriptors([]);
+          setCaptureStep(0);
+        }
+      } catch (err) {
+        console.error("API submission error:", err);
         setStatus("error");
-        setErrorMessage(result.error || "เกิดข้อผิดพลาดในการลงทะเบียนใบหน้า");
+        setErrorMessage("ไม่สามารถเชื่อมต่อเครื่องเซิร์ฟเวอร์ฐานข้อมูลได้");
+        setCapturedDescriptors([]);
+        setCaptureStep(0);
       }
-    } catch (err) {
-      console.error("API submission error:", err);
-      setStatus("error");
-      setErrorMessage("ไม่สามารถเชื่อมต่อเครื่องเซิร์ฟเวอร์ฐานข้อมูลได้");
     }
   };
 
@@ -144,6 +168,8 @@ export default function RegisterPage() {
       return;
     }
     setErrorMessage("");
+    setCapturedDescriptors([]);
+    setCaptureStep(0);
     setStatus("idle"); // reset state to ready for camera interaction
   };
 
@@ -370,12 +396,32 @@ export default function RegisterPage() {
                 </div>
               </div>
             ) : (
-              <CameraCapture
-                onCapture={handleFaceCaptured}
-                status={status}
-                setStatus={setStatus}
-                setErrorMessage={setErrorMessage}
-              />
+              <div className="flex flex-col gap-4">
+                {/* Step indicator bar */}
+                <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm flex flex-col gap-2">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-800 dark:text-slate-200">
+                    <span className="flex items-center gap-1.5">
+                      📸 บันทึกภาพใบหน้าเฉดมุมต่างๆ:
+                    </span>
+                    <span className="text-blue-600 dark:text-blue-400 font-extrabold bg-blue-50 dark:bg-blue-950/40 px-2.5 py-1 rounded-lg border border-blue-100/50 dark:border-blue-900/30">
+                      {captureInstructions[captureStep]}
+                    </span>
+                  </div>
+                  <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                    <div 
+                      className="bg-gradient-to-r from-blue-500 to-indigo-600 h-full transition-all duration-300"
+                      style={{ width: `${((captureStep + 1) / 3) * 100}%` }}
+                    />
+                  </div>
+                </div>
+                
+                <CameraCapture
+                  onCapture={handleFaceCaptured}
+                  status={status}
+                  setStatus={setStatus}
+                  setErrorMessage={setErrorMessage}
+                />
+              </div>
             )
           ) : (
             <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 flex items-center justify-center shadow-inner">

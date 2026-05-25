@@ -2,7 +2,7 @@ export interface Student {
   id: string;
   name: string;
   email: string;
-  faceDescriptor: number[]; // 128-dimensional vector
+  faceDescriptor: number[] | number[][]; // 128-dimensional vector or multi-angle vectors
   consentGiven: boolean;
   registeredAt: string; // ISO format string
   classroom?: string; // e.g., "ป.4/2"
