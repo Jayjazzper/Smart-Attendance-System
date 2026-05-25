@@ -79,8 +79,9 @@ export default function QrCodeScanner({
           {
             fps: 10,
             qrbox: (width, height) => {
-              const size = Math.min(width, height) * 0.65;
-              return { width: size, height: size };
+              const boxWidth = Math.min(width, height) * 0.75;
+              const boxHeight = Math.min(width, height) * 0.55;
+              return { width: boxWidth, height: boxHeight };
             },
           },
           async (decodedText) => {
@@ -123,8 +124,8 @@ export default function QrCodeScanner({
         );
         setIsScanning(true);
       } catch (err) {
-        console.error("QR Code start error:", err);
-        setErrorText("ไม่สามารถเริ่มต้นกล้องสำหรับสแกน QR Code ได้ กรุณาตรวจสอบสิทธิ์เว็บแคม");
+        console.error("QR / Barcode start error:", err);
+        setErrorText("ไม่สามารถเริ่มต้นกล้องสำหรับสแกน QR / Barcode ได้ กรุณาตรวจสอบสิทธิ์การเข้าถึงกล้อง");
       }
     }
 
@@ -157,7 +158,7 @@ export default function QrCodeScanner({
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <p className="text-xs font-bold text-slate-200">กำลังเตรียมกล้องสแกน QR Code...</p>
+          <p className="text-xs font-bold text-slate-200">กำลังเตรียมกล้องสแกน QR / Barcode...</p>
         </div>
       )}
     </div>

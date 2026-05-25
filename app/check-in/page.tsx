@@ -20,7 +20,7 @@ const QrCodeScanner = dynamic(() => import("@/components/QrCodeScanner"), {
   ssr: false,
   loading: () => (
     <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 flex items-center justify-center shadow-inner animate-pulse">
-      <span className="text-xs font-semibold text-slate-400">กำลังดาวน์โหลดตัวสแกน QR Code...</span>
+      <span className="text-xs font-semibold text-slate-400">กำลังดาวน์โหลดตัวสแกน QR / Barcode...</span>
     </div>
   ),
 });
@@ -477,7 +477,7 @@ export default function CheckInPage() {
                       : "text-slate-500 hover:text-slate-900"
                   }`}
                 >
-                  สแกน QR Code (ID Card)
+                  สแกน QR / Barcode (บัตรนักเรียน)
                 </button>
               </div>
             </div>
