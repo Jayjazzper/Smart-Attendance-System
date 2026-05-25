@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       studentEmail: student.email,
       confidence: parseFloat(confidence),
       classroom: recordClassroom,
-      status: recordStatus as 'present' | 'late' | 'absent' | 'leave',
+      status: recordStatus as 'present' | 'late' | 'absent' | 'leave' | 'checked_out',
       timestamp: timestamp,
       temperature: temperature !== undefined ? parseFloat(temperature) : undefined,
       healthStatus: healthStatus || undefined,
@@ -95,6 +95,7 @@ async function triggerLineNotification(token: string, record: any) {
       late: "มาเรียนสาย ⚠️",
       absent: "ขาดเรียน ❌",
       leave: "ลาเรียน ✉️",
+      checked_out: "กลับบ้านแล้ว 🏠",
     };
     const statusText = statusMap[record.status as keyof typeof statusMap] || record.status;
     const timestamp = record.timestamp ? new Date(record.timestamp) : new Date();
@@ -121,7 +122,8 @@ async function triggerLineNotification(token: string, record: any) {
     const healthText = record.healthStatus ? (healthStatusMap[record.healthStatus as keyof typeof healthStatusMap] || record.healthStatus) : null;
     const tempText = record.temperature !== undefined ? `${record.temperature} °C` : null;
 
-    let message = `\n📢 รายงานการเช็คชื่อเข้าเรียน\n👤 นักเรียน: ${record.studentName}\n🆔 รหัสประจำตัว: ${record.studentId}\n🏫 ห้องเรียน: ${record.classroom || "-"}\n📅 วันที่: ${dateStr}\n⏰ เวลา: ${timeStr} น.\n📌 สถานะ: ${statusText}`;
+    const title = record.status === "checked_out" ? "รายงานการเช็คชื่อกลับบ้าน (Check-out)" : "รายงานการเช็คชื่อเข้าเรียน";
+    let message = `\n📢 ${title}\n👤 นักเรียน: ${record.studentName}\n🆔 รหัสประจำตัว: ${record.studentId}\n🏫 ห้องเรียน: ${record.classroom || "-"}\n📅 วันที่: ${dateStr}\n⏰ เวลา: ${timeStr} น.\n📌 สถานะ: ${statusText}`;
 
     if (tempText || healthText) {
       message += `\n🩺 ข้อมูลสุขภาพ:`;
@@ -149,6 +151,7 @@ async function triggerLineOAPushNotification(accessToken: string, toUserId: stri
       late: "มาเรียนสาย ⚠️",
       absent: "ขาดเรียน ❌",
       leave: "ลาเรียน ✉️",
+      checked_out: "กลับบ้านแล้ว 🏠",
     };
     const statusText = statusMap[record.status as keyof typeof statusMap] || record.status;
     const timestamp = record.timestamp ? new Date(record.timestamp) : new Date();
@@ -175,7 +178,8 @@ async function triggerLineOAPushNotification(accessToken: string, toUserId: stri
     const healthText = record.healthStatus ? (healthStatusMap[record.healthStatus as keyof typeof healthStatusMap] || record.healthStatus) : null;
     const tempText = record.temperature !== undefined ? `${record.temperature} °C` : null;
 
-    let message = `📢 รายงานการเช็คชื่อเรียนของบุตรหลาน\n👤 บุตรหลาน: ${record.studentName}\n🆔 รหัสประจำตัว: ${record.studentId}\n🏫 ห้องเรียน: ${record.classroom || "-"}\n📅 วันที่: ${dateStr}\n⏰ เวลา: ${timeStr} น.\n📌 สถานะ: ${statusText}`;
+    const title = record.status === "checked_out" ? "รายงานการลงเวลากลับบ้านของบุตรหลาน" : "รายงานการเช็คชื่อเรียนของบุตรหลาน";
+    let message = `📢 ${title}\n👤 บุตรหลาน: ${record.studentName}\n🆔 รหัสประจำตัว: ${record.studentId}\n🏫 ห้องเรียน: ${record.classroom || "-"}\n📅 วันที่: ${dateStr}\n⏰ เวลา: ${timeStr} น.\n📌 สถานะ: ${statusText}`;
 
     if (tempText || healthText) {
       message += `\n🩺 ข้อมูลสุขภาพ:`;

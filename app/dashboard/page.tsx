@@ -141,18 +141,43 @@ export default function DashboardPage() {
     }
     
     const BOM = "\uFEFF";
-    let csvContent = "รหัสนักเรียน,ชื่อ-นามสกุล,ห้องเรียน,ระดับชั้น,อัตราเข้าเรียน,ระดับความเสี่ยง,สาเหตุ,คำแนะนำการช่วยเหลือ\n";
+    
+    const escapeCSV = (str: string | number) => {
+      const s = String(str);
+      const escaped = s.replace(/"/g, '""').replace(/\r?\n/g, ' ');
+      return `"${escaped}"`;
+    };
+
+    const headers = [
+      "รหัสประจำตัว",
+      "ชื่อ-นามสกุล",
+      "ห้องเรียน",
+      "ระดับชั้น",
+      "อัตราการเข้าเรียน",
+      "ระดับความเสี่ยง",
+      "สาเหตุและพฤติกรรมเสี่ยง",
+      "แนวทางการช่วยเหลือเบื้องต้น"
+    ];
+
+    let csvContent = headers.map(h => escapeCSV(h)).join(",") + "\n";
     
     filteredRiskAlerts.forEach((alert) => {
       const levelText = alert.level === 'kindergarten' ? 'อนุบาล' : alert.level === 'primary' ? 'ประถม' : 'มัธยม';
       const riskText = alert.riskLevel === 'high' ? 'เสี่ยงสูง' : 'เสี่ยงปานกลาง';
       const reasonsText = alert.reasons.join(" | ");
       
-      const nameClean = alert.name.replace(/,/g, " ");
-      const recClean = alert.recommendation.replace(/,/g, " ");
-      const reasonsClean = reasonsText.replace(/,/g, " ");
+      const row = [
+        alert.studentId,
+        alert.name,
+        alert.classroom || "-",
+        levelText,
+        `${alert.attendanceRate}%`,
+        riskText,
+        reasonsText,
+        alert.recommendation
+      ];
       
-      csvContent += `${alert.studentId},${nameClean},${alert.classroom},${levelText},${alert.attendanceRate}%,${riskText},${reasonsClean},${recClean}\n`;
+      csvContent += row.map(cell => escapeCSV(cell)).join(",") + "\n";
     });
     
     const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });

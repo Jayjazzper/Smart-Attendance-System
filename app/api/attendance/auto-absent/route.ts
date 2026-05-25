@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     const attendance = await getAttendance();
     const todayLogs = attendance.filter((log) => {
       const logDate = new Date(log.timestamp);
-      return logDate >= todayStart && logDate <= todayEnd;
+      return log.status !== "checked_out" && logDate >= todayStart && logDate <= todayEnd;
     });
 
     // Create a Set of student IDs who have checked in today

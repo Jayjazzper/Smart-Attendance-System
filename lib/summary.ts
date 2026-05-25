@@ -30,7 +30,7 @@ export async function sendDailySummaryForClassroom(classroom: string, date?: Dat
     const attendance = await getAttendance();
     const classLogs = attendance.filter(log => {
       const logDate = new Date(log.timestamp);
-      return log.classroom === classroom && logDate >= todayStart && logDate <= todayEnd;
+      return log.classroom === classroom && log.status !== "checked_out" && logDate >= todayStart && logDate <= todayEnd;
     });
 
     // 3. Map student ID to latest attendance log

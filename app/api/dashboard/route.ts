@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     const todayStart = startOfDay(new Date());
     const todayLogs = attendance.filter((log) => {
       const logDate = new Date(log.timestamp);
-      return logDate >= todayStart;
+      return log.status !== "checked_out" && logDate >= todayStart;
     });
 
     const uniquePresentToday = new Set(todayLogs.map((log) => log.studentId));
@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
       
       const dayLogs = attendance.filter((log) => {
         const logDate = new Date(log.timestamp);
-        return logDate >= dayStart && logDate < nextDayStart;
+        return log.status !== "checked_out" && logDate >= dayStart && logDate < nextDayStart;
       });
 
       // Calculate attendance rate
@@ -226,7 +226,8 @@ export async function GET(req: NextRequest) {
       return Array.from(dates).sort();
     };
 
-    let schoolDates = getUniqueSchoolDates(attendance);
+    const schoolAttendance = attendance.filter(log => log.status !== "checked_out");
+    let schoolDates = getUniqueSchoolDates(schoolAttendance);
     // Fallback if there are too few days in database
     if (schoolDates.length < 2) {
       const tempDates: string[] = [];
@@ -244,7 +245,7 @@ export async function GET(req: NextRequest) {
     }
 
     const riskAlerts = students.map(student => {
-      const studentLogs = attendance.filter(log => log.studentId === student.id);
+      const studentLogs = schoolAttendance.filter(log => log.studentId === student.id);
       
       const statusByDate = new Map<string, string>();
       studentLogs.forEach(log => {
