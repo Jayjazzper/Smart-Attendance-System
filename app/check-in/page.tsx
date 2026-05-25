@@ -57,7 +57,7 @@ export default function CheckInPage() {
   const [healthCheckInStatus, setHealthCheckInStatus] = useState<'present' | 'late' | 'absent' | 'leave'>('present');
   const [healthTemperature, setHealthTemperature] = useState(36.5);
   const [healthStatus, setHealthStatus] = useState<'normal' | 'fever' | 'cough'>('normal');
-  const [countdown, setCountdown] = useState(3);
+  const [countdown, setCountdown] = useState(5);
   const [isCountdownActive, setIsCountdownActive] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
@@ -407,7 +407,7 @@ export default function CheckInPage() {
         setHealthCheckInStatus(checkInStatus);
         setHealthTemperature(36.5);
         setHealthStatus("normal");
-        setCountdown(3);
+        setCountdown(5);
         setIsCountdownActive(true);
         setShowHealthModal(true);
       } else {
@@ -877,7 +877,7 @@ export default function CheckInPage() {
               <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
                 <div 
                   className="bg-blue-600 dark:bg-blue-400 h-full transition-all duration-1000 ease-linear"
-                  style={{ width: `${(countdown / 3) * 100}%` }}
+                  style={{ width: `${(countdown / 5) * 100}%` }}
                 ></div>
               </div>
             )}
