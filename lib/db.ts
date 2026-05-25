@@ -935,6 +935,15 @@ export async function updateLeaveRequestStatus(
             status: 'leave'
           };
 
+          // If Google Sheets is active, sync log to Google Sheets immediately
+          if (isGoogleSheetsActive()) {
+            try {
+              await callGoogleScript('addAttendance', { record: newRecord });
+            } catch (sheetErr) {
+              console.warn('Failed to sync leave record to Google Sheets, using local cache:', sheetErr);
+            }
+          }
+
           attendance.push(newRecord);
           current.setDate(current.getDate() + 1);
         }
