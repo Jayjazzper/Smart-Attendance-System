@@ -150,7 +150,7 @@ export default function FaceDetector({
     try {
       // Detect face and extract descriptor
       const detection = await faceapi
-        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 }))
         .withFaceLandmarks()
         .withFaceDescriptor();
 
@@ -248,7 +248,7 @@ export default function FaceDetector({
 
       const detections = await faceapi.detectAllFaces(
         video,
-        new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })
+        new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.3 })
       );
 
       const resizedDetections = faceapi.resizeResults(detections, displaySize);
