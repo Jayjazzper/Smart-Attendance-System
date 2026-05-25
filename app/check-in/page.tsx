@@ -31,12 +31,13 @@ interface CheckInLog {
   time: string;
   distance: number;
   classroom?: string;
-  status?: 'present' | 'late' | 'absent' | 'leave';
+  status?: 'present' | 'late' | 'absent' | 'leave' | 'checked_out';
 }
 
 export default function CheckInPage() {
   const [scanMode, setScanMode] = useState<"auto" | "manual">("auto");
   const [scannerType, setScannerType] = useState<"face" | "qrcode">("face");
+  const [checkMode, setCheckMode] = useState<"checkin" | "checkout">("checkin");
   const [isScanning, setIsScanning] = useState(true);
   const [matchStatus, setMatchStatus] = useState<"searching" | "found" | "failed">("searching");
   const [currentMatch, setCurrentMatch] = useState<CheckInLog | null>(null);
@@ -54,7 +55,7 @@ export default function CheckInPage() {
   const [showHealthModal, setShowHealthModal] = useState(false);
   const [healthStudent, setHealthStudent] = useState<any | null>(null);
   const [healthDistance, setHealthDistance] = useState(0);
-  const [healthCheckInStatus, setHealthCheckInStatus] = useState<'present' | 'late' | 'absent' | 'leave'>('present');
+  const [healthCheckInStatus, setHealthCheckInStatus] = useState<'present' | 'late' | 'absent' | 'leave' | 'checked_out'>('present');
   const [healthTemperature, setHealthTemperature] = useState(36.5);
   const [healthStatus, setHealthStatus] = useState<'normal' | 'fever' | 'cough'>('normal');
   const [countdown, setCountdown] = useState(5);
@@ -228,14 +229,16 @@ export default function CheckInPage() {
     );
 
     if (matched) {
-      let checkInStatus: "present" | "late" = "present";
-      const timeNow = new Date();
-      const currentHours = timeNow.getHours();
-      const currentMinutes = timeNow.getMinutes();
+      let checkInStatus: "present" | "late" | "checked_out" = checkMode === "checkout" ? "checked_out" : "present";
+      if (checkMode !== "checkout") {
+        const timeNow = new Date();
+        const currentHours = timeNow.getHours();
+        const currentMinutes = timeNow.getMinutes();
 
-      const [hrHour, hrMin] = (homeroomTime || "08:00").split(":").map(Number);
-      if (currentHours > hrHour || (currentHours === hrHour && currentMinutes > hrMin)) {
-        checkInStatus = "late";
+        const [hrHour, hrMin] = (homeroomTime || "08:00").split(":").map(Number);
+        if (currentHours > hrHour || (currentHours === hrHour && currentMinutes > hrMin)) {
+          checkInStatus = "late";
+        }
       }
 
       handleFaceMatch(matched, 0.0, checkInStatus);
@@ -300,7 +303,7 @@ export default function CheckInPage() {
   // Helper to submit check-in to API or queue offline
   const submitCheckIn = async (
     student: any,
-    status: 'present' | 'late' | 'absent' | 'leave',
+    status: 'present' | 'late' | 'absent' | 'leave' | 'checked_out',
     confidence: number,
     temp?: number,
     hStatus?: 'normal' | 'fever' | 'cough'
@@ -391,12 +394,12 @@ export default function CheckInPage() {
   const handleFaceMatch = async (
     matchedStudent: Student | null,
     distance: number,
-    status?: 'present' | 'late' | 'absent' | 'leave'
+    status?: 'present' | 'late' | 'absent' | 'leave' | 'checked_out'
   ) => {
     const formattedTime = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น.";
     
     if (matchedStudent) {
-      const checkInStatus = status || "present";
+      const checkInStatus = checkMode === "checkout" ? "checked_out" : (status || "present");
       const confidenceScore = Math.round((1 - distance) * 100);
 
       if (enableHealthScreening) {
@@ -579,6 +582,35 @@ export default function CheckInPage() {
           </div>
 
           <div className="rounded-2xl border border-slate-100 bg-white dark:bg-slate-900 p-4 shadow-sm">
+            {/* Check-in / Check-out Mode Switcher */}
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800 pb-3">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">🕒 โหมดบันทึกเวลาเรียน:</span>
+              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-950 rounded-xl p-1">
+                <button
+                  onClick={() => setCheckMode("checkin")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    checkMode === "checkin"
+                      ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  <svg xmlns="http://www.w3.org/2050/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+                  สแกนเข้าเรียน (Check-in)
+                </button>
+                <button
+                  onClick={() => setCheckMode("checkout")}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    checkMode === "checkout"
+                      ? "bg-white dark:bg-slate-900 text-rose-600 dark:text-rose-400 shadow-sm"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  <svg xmlns="http://www.w3.org/2050/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10 9H4v6"/><path d="M14 20H4v-6"/><path d="M19 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>
+                  สแกนกลับบ้าน (Check-out)
+                </button>
+              </div>
+            </div>
+
             {/* Scanner Type Switcher */}
             <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800 pb-3">
               <span className="text-xs font-bold text-slate-800 dark:text-slate-200">📸 เลือกรูปแบบเครื่องสแกน:</span>
@@ -660,9 +692,19 @@ export default function CheckInPage() {
             )}
 
             {/* Webcam Live Frame Container */}
-            <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-950 flex items-center justify-center">
+            <div className={`relative aspect-video w-full overflow-hidden rounded-xl border-2 bg-slate-950 flex items-center justify-center transition-colors ${
+              checkMode === "checkout"
+                ? "border-rose-500 shadow-lg shadow-rose-500/10"
+                : "border-slate-200 dark:border-slate-800"
+            }`}>
               {/* Scan Laser Line */}
-              {isScanning && <div className="animate-scan"></div>}
+              {isScanning && (
+                <div className={`absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r ${
+                  checkMode === "checkout"
+                    ? "from-transparent via-rose-500 to-transparent shadow-[0_0_8px_rgba(244,63,94,0.8)] animate-scan"
+                    : "from-transparent via-blue-500 to-transparent shadow-[0_0_8px_rgba(59,130,246,0.8)] animate-scan"
+                }`}></div>
+              )}
 
               {/* Conditional Scanner Component */}
               {scannerType === "face" ? (
@@ -724,11 +766,13 @@ export default function CheckInPage() {
                         )}
                         {matchStatus === "found" && (
                           <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                            currentMatch.status === "late"
+                            currentMatch.status === "checked_out"
+                              ? "bg-rose-500/20 border border-rose-500/30 text-rose-400"
+                              : currentMatch.status === "late"
                               ? "bg-amber-500/20 border border-amber-500/30 text-amber-400"
                               : "bg-emerald-500/20 border border-emerald-500/30 text-emerald-400"
                           }`}>
-                            {currentMatch.status === "late" ? "สาย" : "มาเรียน"}
+                            {currentMatch.status === "checked_out" ? "กลับบ้าน" : currentMatch.status === "late" ? "สาย" : "มาเรียน"}
                           </span>
                         )}
                       </div>
@@ -813,8 +857,14 @@ export default function CheckInPage() {
                         <div className="flex items-center gap-1.5 text-[9px] text-slate-500 font-semibold">
                           <span>รหัส: {record.id}</span>
                           <span>•</span>
-                          <span className={`font-bold ${record.status === "late" ? "text-amber-600" : "text-emerald-600"}`}>
-                            {record.status === "late" ? "สาย" : "มาเรียน"}
+                          <span className={`font-bold ${
+                            record.status === "checked_out"
+                              ? "text-rose-600 dark:text-rose-450"
+                              : record.status === "late"
+                              ? "text-amber-600 dark:text-amber-450"
+                              : "text-emerald-600 dark:text-emerald-450"
+                          }`}>
+                            {record.status === "checked_out" ? "กลับบ้าน" : record.status === "late" ? "สาย" : "มาเรียน"}
                           </span>
                         </div>
                       </div>
@@ -868,7 +918,7 @@ export default function CheckInPage() {
                 {healthStudent.name}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
-                ชั้นเรียน: {healthStudent.classroom || "ไม่ระบุ"} | สถานะ: {healthCheckInStatus === "late" ? "สาย" : "ปกติ"}
+                ชั้นเรียน: {healthStudent.classroom || "ไม่ระบุ"} | สถานะ: {healthCheckInStatus === "checked_out" ? "กลับบ้าน" : healthCheckInStatus === "late" ? "สาย" : "ปกติ"}
               </p>
             </div>
 

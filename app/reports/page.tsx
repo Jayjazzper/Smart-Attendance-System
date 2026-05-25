@@ -167,7 +167,7 @@ export default function ReportsPage() {
 
   // 4. Calculate individual student statistics
   const studentsStats: StudentReportStats[] = filteredStudents.map(student => {
-    const studentLogs = attendance.filter(log => log.studentId === student.id);
+    const studentLogs = attendance.filter(log => log.studentId === student.id && log.status !== "checked_out");
     
     // Group logs by date (YYYY-MM-DD)
     const logsByDate: Record<string, Attendance[]> = {};
@@ -194,7 +194,7 @@ export default function ReportsPage() {
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
         )[0];
         
-        const status = latestLog.status || "present";
+        const status = (latestLog.status || "present") as 'present' | 'late' | 'absent' | 'leave';
         dailyStatus[dateStr] = status;
         
         if (status === "present") presentCount++;

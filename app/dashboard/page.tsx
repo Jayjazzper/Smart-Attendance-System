@@ -100,7 +100,7 @@ export default function DashboardPage() {
   const [resetSuccess, setResetSuccess] = useState(false);
   const [selectedLevel, setSelectedLevel] = useState<"all" | "kindergarten" | "primary" | "secondary">("all");
   const [lockedClassroom, setLockedClassroom] = useState<string | null>(null);
-  
+
   const [metrics, setMetrics] = useState<DashboardMetrics>({
     totalStudents: 0,
     presentToday: 0,
@@ -120,6 +120,50 @@ export default function DashboardPage() {
     }
   });
   const [loading, setLoading] = useState(true);
+
+  const [riskLevelFilter, setRiskLevelFilter] = useState<string>("all");
+  const [riskClassroomFilter, setRiskClassroomFilter] = useState<string>("all");
+
+  const uniqueClassrooms = Array.from(
+    new Set(metrics.riskAlerts?.map((a) => a.classroom).filter(Boolean) || [])
+  ).sort() as string[];
+
+  const filteredRiskAlerts = (metrics.riskAlerts || []).filter((alert) => {
+    const matchesLevel = riskLevelFilter === "all" || alert.level === riskLevelFilter;
+    const matchesClassroom = riskClassroomFilter === "all" || alert.classroom === riskClassroomFilter;
+    return matchesLevel && matchesClassroom;
+  });
+
+  const handleExportRiskReport = () => {
+    if (!filteredRiskAlerts || filteredRiskAlerts.length === 0) {
+      alert("ไม่มีข้อมูลที่จะส่งออกรายงาน");
+      return;
+    }
+    
+    const BOM = "\uFEFF";
+    let csvContent = "รหัสนักเรียน,ชื่อ-นามสกุล,ห้องเรียน,ระดับชั้น,อัตราเข้าเรียน,ระดับความเสี่ยง,สาเหตุ,คำแนะนำการช่วยเหลือ\n";
+    
+    filteredRiskAlerts.forEach((alert) => {
+      const levelText = alert.level === 'kindergarten' ? 'อนุบาล' : alert.level === 'primary' ? 'ประถม' : 'มัธยม';
+      const riskText = alert.riskLevel === 'high' ? 'เสี่ยงสูง' : 'เสี่ยงปานกลาง';
+      const reasonsText = alert.reasons.join(" | ");
+      
+      const nameClean = alert.name.replace(/,/g, " ");
+      const recClean = alert.recommendation.replace(/,/g, " ");
+      const reasonsClean = reasonsText.replace(/,/g, " ");
+      
+      csvContent += `${alert.studentId},${nameClean},${alert.classroom},${levelText},${alert.attendanceRate}%,${riskText},${reasonsClean},${recClean}\n`;
+    });
+    
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `รายงานเด็กกลุ่มเสี่ยง_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // 1. Fetch dashboard metrics from API Route
   const fetchMetrics = async (showLoadingState = false) => {
@@ -371,11 +415,58 @@ export default function DashboardPage() {
               </span>
             </div>
 
+            {/* Filter controls and Export button */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50 dark:bg-slate-950/30 p-3 rounded-xl border border-slate-100/80 dark:border-slate-800/40">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                  <svg xmlns="http://www.w3.org/2055/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+                  ตัวกรอง:
+                </span>
+                
+                {/* Level filter selector */}
+                <select
+                  value={riskLevelFilter}
+                  onChange={(e) => {
+                    setRiskLevelFilter(e.target.value);
+                    setRiskClassroomFilter("all");
+                  }}
+                  className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2.5 py-1.5 text-[11px] font-bold focus:border-blue-500 focus:outline-none transition-colors text-slate-705 dark:text-slate-350 cursor-pointer"
+                >
+                  <option value="all">ระดับชั้นทั้งหมด</option>
+                  <option value="kindergarten">อนุบาล</option>
+                  <option value="primary">ประถม</option>
+                  <option value="secondary">มัธยม</option>
+                </select>
+
+                {/* Classroom filter selector */}
+                <select
+                  value={riskClassroomFilter}
+                  onChange={(e) => setRiskClassroomFilter(e.target.value)}
+                  className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2.5 py-1.5 text-[11px] font-bold focus:border-blue-500 focus:outline-none transition-colors text-slate-705 dark:text-slate-355 cursor-pointer"
+                >
+                  <option value="all">ห้องเรียนทั้งหมด</option>
+                  {uniqueClassrooms.map((cls) => (
+                    <option key={cls} value={cls}>ห้อง {cls}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Export Report CTA */}
+              <button
+                onClick={handleExportRiskReport}
+                disabled={filteredRiskAlerts.length === 0}
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 px-3 py-2 text-[11px] font-black text-white shadow-sm hover:bg-blue-700 disabled:hover:bg-slate-200 dark:disabled:hover:bg-slate-800 transition-all cursor-pointer whitespace-nowrap self-end sm:self-auto"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+                ดาวน์โหลดรายงานกลุ่มเสี่ยง (.csv)
+              </button>
+            </div>
+
             {/* List of Risk Alerts */}
             <div className="flex flex-col gap-4">
-              {metrics.riskAlerts && metrics.riskAlerts.length > 0 ? (
+              {filteredRiskAlerts.length > 0 ? (
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {metrics.riskAlerts.map((alert) => (
+                  {filteredRiskAlerts.map((alert) => (
                     <div
                       key={alert.studentId}
                       className={`p-4 rounded-xl border flex flex-col justify-between gap-3 transition-all hover:shadow-md ${

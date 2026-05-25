@@ -18,7 +18,7 @@ export interface Attendance {
   confidence: number; // confidence score percentage
   timestamp: string; // ISO format string
   classroom?: string;
-  status?: 'present' | 'late' | 'absent' | 'leave';
+  status?: 'present' | 'late' | 'absent' | 'leave' | 'checked_out';
   temperature?: number; // Body temperature in Celsius
   healthStatus?: 'normal' | 'fever' | 'cough'; // Health screening status
 }
