@@ -527,7 +527,7 @@ export default function CheckInPage() {
             <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
               <div className="flex flex-col gap-0.5">
                 <span className="text-xs font-bold text-slate-900">🩺 เปิดระบบคัดกรองสุขภาพ (Health Screening)</span>
-                <p className="text-[10px] font-semibold text-slate-500">บันทึกอุณหภูมิและอาการทางร่างกายของนักเรียนเมื่อเช็คชื่อ</p>
+                <p className="text-[10px] font-semibold text-slate-500">บันทึกอุณหภูมิ (ป้อนด้วยมือจากเครื่องวัดไข้จริง) และอาการป่วยเมื่อเด็กเช็คชื่อ</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
@@ -885,7 +885,10 @@ export default function CheckInPage() {
             {/* Temperature Slider & Input */}
             <div className="flex flex-col gap-2 p-4 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800/50">
               <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">🌡️ อุณหภูมิร่างกาย</span>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">🌡️ บันทึกอุณหภูมิร่างกาย</span>
+                  <span className="text-[9px] font-medium text-slate-400 dark:text-slate-500 leading-none mt-0.5">(ป้อนค่าจริงที่วัดได้จากเครื่องวัดไข้หน้าโรงเรียน)</span>
+                </div>
                 <span className={`text-base font-extrabold ${healthTemperature >= 37.5 ? "text-red-500" : "text-emerald-500"}`}>
                   {healthTemperature.toFixed(1)} °C
                 </span>
