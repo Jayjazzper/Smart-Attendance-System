@@ -1,5 +1,15 @@
+// Prevent registering multiple intervals during Next.js hot reloads in development mode
+const globalWithScheduler = global as typeof globalThis & {
+  summarySchedulerActive?: boolean;
+};
+
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    if (globalWithScheduler.summarySchedulerActive) {
+      return;
+    }
+    globalWithScheduler.summarySchedulerActive = true;
+
     console.log("Smart Attendance System: Initializing Daily Summary Background Scheduler (running every minute)...");
     
     // We dynamically import database and summary helpers to avoid early import loading conflicts during Next.js boot
