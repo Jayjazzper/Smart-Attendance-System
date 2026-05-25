@@ -212,6 +212,29 @@ export default function HeaderNavigation() {
                 </Link>
               </>
             )}
+            {currentUser && (
+              <>
+                <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch("/api/auth/logout", { method: "POST" });
+                      if (res.ok) {
+                        localStorage.removeItem("teacherSession");
+                        localStorage.removeItem("adminValidated");
+                        window.location.reload();
+                      }
+                    } catch (e) {
+                      console.error("Error logging out:", e);
+                    }
+                  }}
+                  className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/20 hover:text-rose-700 transition-colors text-left cursor-pointer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                  ออกจากระบบ (Logout)
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
