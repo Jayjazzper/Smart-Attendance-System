@@ -21,6 +21,8 @@ export const metadata: Metadata = {
   description: "ระบบเช็คชื่อนักเรียนรูปแบบใหม่ด้วย Face Recognition มั่นคง ปลอดภัย รองรับ PDPA",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function RootLayout({
   children,
 }: Readonly<{

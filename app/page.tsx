@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getSettings } from "@/lib/db";
 
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   const settings = await getSettings();
   const schoolName = settings.schoolName || process.env.NEXT_PUBLIC_SCHOOL_NAME || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)";
