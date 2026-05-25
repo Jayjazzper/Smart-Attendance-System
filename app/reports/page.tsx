@@ -42,6 +42,11 @@ export default function ReportsPage() {
   const [customStartDate, setCustomStartDate] = useState(format(subDays(new Date(), 6), "yyyy-MM-dd"));
   const [customEndDate, setCustomEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [lockedClassroom, setLockedClassroom] = useState<string | null>(null);
+  const [schoolSettings, setSchoolSettings] = useState({
+    schoolName: "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)",
+    schoolDistrict: "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1",
+    schoolLogo: ""
+  });
 
   // Manual Log Modal State
   const [showManualModal, setShowManualModal] = useState(false);
@@ -58,10 +63,11 @@ export default function ReportsPage() {
   // 1. Fetch Students, Attendance, and Leave records
   const fetchData = async () => {
     try {
-      const [studentsRes, attendanceRes, leavesRes] = await Promise.all([
+      const [studentsRes, attendanceRes, leavesRes, settingsRes] = await Promise.all([
         fetch("/api/students"),
         fetch("/api/attendance"),
-        fetch("/api/leaves")
+        fetch("/api/leaves"),
+        fetch("/api/settings")
       ]);
       
       if (studentsRes.ok && attendanceRes.ok && leavesRes.ok) {
@@ -71,6 +77,14 @@ export default function ReportsPage() {
         setStudents(studentsData.students || []);
         setAttendance(attendanceData.attendance || []);
         setLeaves(leavesData.leaves || []);
+      }
+      if (settingsRes && settingsRes.ok) {
+        const settingsData = await settingsRes.json();
+        setSchoolSettings({
+          schoolName: settingsData.schoolName || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)",
+          schoolDistrict: settingsData.schoolDistrict || "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1",
+          schoolLogo: settingsData.schoolLogo || ""
+        });
       }
     } catch (err) {
       console.error("Error loading reports data:", err);
@@ -474,7 +488,142 @@ export default function ReportsPage() {
 
   return (
     <AdminGuard allowTeacher>
-      <div className="flex flex-col gap-6 py-6 animate-fade-in relative">
+      <style dangerouslySetInnerHTML={{__html: `
+        @media print {
+          /* Hide layout header and footer */
+          header, footer, .no-print {
+            display: none !important;
+          }
+          
+          /* Ensure the body background is clean for printing */
+          body, html {
+            background: white !important;
+            color: black !important;
+          }
+          
+          /* Main Next.js content adjustments for printing */
+          main {
+            padding: 0 !important;
+            margin: 0 !important;
+            max-width: 100% !important;
+            background: transparent !important;
+          }
+
+          /* Print page size and margin settings */
+          @page {
+            size: A4 landscape;
+            margin: 12mm 10mm 12mm 10mm;
+          }
+
+          /* Custom print layout styling */
+          .print-only-container {
+            display: block !important;
+            width: 100% !important;
+            color: black !important;
+          }
+
+          .print-header {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            margin-bottom: 16px !important;
+          }
+
+          .print-title {
+            font-size: 16px !important;
+            font-weight: bold !important;
+            margin-top: 6px !important;
+            color: black !important;
+          }
+
+          .print-subtitle {
+            font-size: 12px !important;
+            margin-top: 2px !important;
+            color: #333 !important;
+          }
+
+          .print-metadata {
+            font-size: 10px !important;
+            color: #555 !important;
+            margin-top: 6px !important;
+            font-weight: bold !important;
+          }
+
+          .print-summary-grid {
+            display: grid !important;
+            grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+            gap: 8px !important;
+            border: 1px solid #333 !important;
+            padding: 8px !important;
+            margin-bottom: 16px !important;
+            background-color: #f8fafc !important;
+            border-radius: 6px !important;
+            text-align: center !important;
+          }
+
+          .print-summary-item {
+            display: flex !important;
+            flex-direction: column !important;
+          }
+
+          .print-summary-label {
+            font-size: 8px !important;
+            font-weight: bold !important;
+            color: #555 !important;
+            text-transform: uppercase !important;
+          }
+
+          .print-summary-value {
+            font-size: 12px !important;
+            font-weight: 800 !important;
+            margin-top: 1px !important;
+          }
+
+          .print-table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            margin-top: 8px !important;
+          }
+
+          .print-table th, .print-table td {
+            border: 1px solid #333 !important;
+            padding: 4px 2px !important;
+            font-size: 9px !important;
+            text-align: center !important;
+            color: black !important;
+          }
+
+          .print-table th {
+            background-color: #f1f5f9 !important;
+            font-weight: bold !important;
+          }
+
+          .print-table td.student-name {
+            text-align: left !important;
+            padding-left: 4px !important;
+          }
+
+          .print-signatures {
+            display: flex !important;
+            justify-content: space-between !important;
+            margin-top: 30px !important;
+            page-break-inside: avoid !important;
+          }
+
+          .print-signature-block {
+            width: 45% !important;
+            text-align: center !important;
+            font-size: 10px !important;
+          }
+
+          .print-signature-line {
+            border-bottom: 1px dotted #333 !important;
+            margin-bottom: 4px !important;
+            height: 30px !important;
+          }
+        }
+      `}} />
+      <div className="flex flex-col gap-6 py-6 animate-fade-in relative no-print">
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex flex-col gap-1.5">
@@ -489,11 +638,20 @@ export default function ReportsPage() {
         {/* Actions Button Row */}
         <div className="flex flex-wrap gap-2.5">
           <button
+            onClick={() => window.print()}
+            disabled={studentsStats.length === 0}
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm cursor-pointer animate-fade-in"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            พิมพ์รายงาน PDF (Print PDF)
+          </button>
+
+          <button
             onClick={handleExportCSV}
             disabled={studentsStats.length === 0}
             className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm cursor-pointer"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <svg xmlns="http://www.w3.org/2059/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             ส่งออกรายงาน (CSV)
           </button>
 
@@ -1045,6 +1203,129 @@ export default function ReportsPage() {
           </div>
         </div>
       )}
+    </div>
+
+    {/* Print Layout (Only visible when printing) */}
+    <div className="hidden print-only-container">
+      {/* School Crest & Header */}
+      <div className="print-header">
+        {schoolSettings.schoolLogo ? (
+          <img src={schoolSettings.schoolLogo} alt="School Logo" className="h-16 w-16 object-contain mb-2" />
+        ) : (
+          <div className="h-14 w-14 bg-slate-100 border border-slate-300 rounded-full flex items-center justify-center mb-2">
+             <span className="text-[9px] font-bold text-slate-500">ตราโรงเรียน</span>
+          </div>
+        )}
+        <h2 className="print-title">รายงานบันทึกการเข้าเรียนและคัดกรองสุขภาพนักเรียน</h2>
+        <div className="print-subtitle font-bold">{schoolSettings.schoolName}</div>
+        <div className="print-subtitle text-[11px] text-slate-500">{schoolSettings.schoolDistrict}</div>
+        
+        {/* Document Info */}
+        <div className="print-metadata flex gap-6">
+          <span>ระดับชั้น: {selectedLevel === "all" ? "ทุกระดับชั้น" : selectedLevel === "kindergarten" ? "อนุบาล" : selectedLevel === "primary" ? "ประถมศึกษา" : "มัธยมศึกษา"}</span>
+          <span>ห้องเรียน: {selectedClassroom === "all" ? "ทุกห้องเรียน" : selectedClassroom}</span>
+          <span>ช่วงวันที่: {format(startDate, "dd/MM/yyyy")} ถึง {format(endDate, "dd/MM/yyyy")}</span>
+        </div>
+      </div>
+
+      {/* Summary Row */}
+      <div className="print-summary-grid">
+        <div className="print-summary-item">
+          <span className="print-summary-label">ร้อยละการมาเรียนเฉลี่ย</span>
+          <span className="print-summary-value text-blue-600">{avgAttendanceRate}%</span>
+        </div>
+        <div className="print-summary-item">
+          <span className="print-summary-label">มาเรียนปกติรวม</span>
+          <span className="print-summary-value text-emerald-600">{totalPresent} ครั้ง</span>
+        </div>
+        <div className="print-summary-item">
+          <span className="print-summary-label">มาสายรวม</span>
+          <span className="print-summary-value text-amber-600">{totalLate} ครั้ง</span>
+        </div>
+        <div className="print-summary-item">
+          <span className="print-summary-label">ขาดเรียนรวม</span>
+          <span className="print-summary-value text-red-500">{totalAbsent} ครั้ง</span>
+        </div>
+        <div className="print-summary-item">
+          <span className="print-summary-label">ลากิจ/ลาป่วยรวม</span>
+          <span className="print-summary-value text-purple-600">{totalLeave} ครั้ง</span>
+        </div>
+      </div>
+
+      {/* Main Table */}
+      <table className="print-table">
+        <thead>
+          <tr>
+            <th className="w-[70px]">รหัสประจำตัว</th>
+            <th className="w-[150px] text-left">ชื่อ-นามสกุล</th>
+            <th className="w-[50px]">ห้องเรียน</th>
+            <th className="w-[35px]">มา (วัน)</th>
+            <th className="w-[35px]">สาย (วัน)</th>
+            <th className="w-[35px]">ขาด (วัน)</th>
+            <th className="w-[35px]">ลา (วัน)</th>
+            <th className="w-[50px]">% การมา</th>
+            {datesList.map(dateStr => {
+              const parsedDate = new Date(dateStr);
+              const displayDate = parsedDate.toLocaleDateString("th-TH", { day: "numeric", month: "numeric" });
+              return (
+                <th key={dateStr} className="text-center text-[7.5px] w-[30px] font-normal">
+                  {displayDate}
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {studentsStats.map(({ student, presentCount, lateCount, absentCount, leaveCount, attendanceRate, dailyStatus }) => {
+            return (
+              <tr key={student.id}>
+                <td className="font-bold">{student.id}</td>
+                <td className="student-name font-bold">{student.name}</td>
+                <td>{student.classroom || "-"}</td>
+                <td>{presentCount}</td>
+                <td>{lateCount}</td>
+                <td className={absentCount > 0 ? "text-red-650 font-bold" : ""}>{absentCount}</td>
+                <td>{leaveCount}</td>
+                <td className="font-bold">{attendanceRate}%</td>
+                {datesList.map(dateStr => {
+                  const status = dailyStatus[dateStr];
+                  return (
+                    <td key={dateStr} className="text-center font-bold">
+                      {status === "present" && "✓"}
+                      {status === "late" && "ส"}
+                      {status === "absent" && "ข"}
+                      {status === "leave" && "ล"}
+                      {status === "none" && "-"}
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <div className="text-[8px] font-bold text-slate-500 mt-2">
+        * สัญลักษณ์สถานะรายวัน: ✓ = มาเรียนปกติ | ส = มาสาย | ข = ขาดเรียน | ล = ลากิจ/ลาป่วย | - = ไม่มีบันทึก
+      </div>
+
+      {/* Signatures */}
+      <div className="print-signatures">
+        <div className="print-signature-block">
+          <div className="print-signature-line"></div>
+          <p className="font-bold">ลงชื่อ..........................................................ครูประจำชั้น</p>
+          <p className="mt-1 text-slate-500">(..........................................................)</p>
+          <p className="mt-0.5 text-[9px]">ผู้จัดทำ/ผู้รายงาน</p>
+          <p className="mt-0.5 text-[9px]">วันที่ ........ / ................ / ............</p>
+        </div>
+        <div className="print-signature-block">
+          <div className="print-signature-line"></div>
+          <p className="font-bold">ลงชื่อ..........................................................ผู้บริหารโรงเรียน</p>
+          <p className="mt-1 text-slate-500">(..........................................................)</p>
+          <p className="mt-0.5 text-[9px]">ผู้อำนวยการโรงเรียน{schoolSettings.schoolName}</p>
+          <p className="mt-0.5 text-[9px]">วันที่ ........ / ................ / ............</p>
+        </div>
+      </div>
     </div>
     </AdminGuard>
   );

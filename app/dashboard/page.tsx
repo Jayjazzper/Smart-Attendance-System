@@ -14,6 +14,16 @@ const TrendChart = dynamic(() => import("@/components/dashboard/TrendChart"), {
   ),
 });
 
+// Load HealthTrendChart dynamically
+const HealthTrendChart = dynamic(() => import("@/components/dashboard/HealthTrendChart"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-64 w-full items-center justify-center bg-slate-50/50 rounded-xl animate-pulse">
+      <span className="text-xs font-semibold text-slate-400">กำลังโหลดแผนภูมิแนวโน้มสุขภาพ...</span>
+    </div>
+  ),
+});
+
 // Load PeakTimeChart dynamically
 const PeakTimeChart = dynamic(() => import("@/components/dashboard/PeakTimeChart"), {
   ssr: false,
@@ -75,6 +85,7 @@ interface DashboardMetrics {
   lateToday: number;
   attendanceRate: number;
   trendData: { day: string; rate: number }[];
+  healthTrendData?: { day: string; fever: number; cough: number }[];
   recentScans: DashboardScan[];
   leaderboard: ClassroomRank[];
   peakCheckinTimes: { name: string; count: number }[];
@@ -96,6 +107,7 @@ export default function DashboardPage() {
     lateToday: 0,
     attendanceRate: 0,
     trendData: [],
+    healthTrendData: [],
     recentScans: [],
     leaderboard: [],
     peakCheckinTimes: [],
@@ -137,6 +149,7 @@ export default function DashboardPage() {
           lateToday: data.lateToday || 0,
           attendanceRate: data.attendanceRate || 0,
           trendData: data.trendData || [],
+          healthTrendData: data.healthTrendData || [],
           recentScans: data.recentScans || [],
           leaderboard: data.leaderboard || [],
           peakCheckinTimes: data.peakCheckinTimes || [],
@@ -527,8 +540,8 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Charts Grid: Trend and Peak Check-in Times */}
-          <div className="grid gap-6 md:grid-cols-2 mt-2 animate-fade-in">
+          {/* Charts Grid: Trend, Health, and Peak Check-in Times */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mt-2 animate-fade-in">
             {/* Trend Area Chart */}
             <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm">
               <div className="flex items-center justify-between mb-6">
@@ -543,6 +556,22 @@ export default function DashboardPage() {
                 </span>
               </div>
               <TrendChart data={metrics.trendData} />
+            </div>
+
+            {/* Health Trend Chart */}
+            <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">แนวโน้มสุขภาพสะสมย้อนหลัง 7 วัน</h3>
+                  <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
+                    ยอดรวมสถิติเด็กไอหรือมีไข้สะสมสัปดาห์นี้เพื่อเฝ้าระวังโรคระบาด
+                  </p>
+                </div>
+                <span className="rounded-lg bg-red-50 dark:bg-red-950/30 px-2.5 py-1 text-[10px] font-bold text-red-600 dark:text-red-400 border border-red-100/50 dark:border-red-900/30">
+                  เฝ้าระวังโรค
+                </span>
+              </div>
+              <HealthTrendChart data={metrics.healthTrendData} />
             </div>
 
             {/* Peak Arrival Time Distribution Chart */}

@@ -60,10 +60,11 @@ export async function GET(req: NextRequest) {
       ? parseFloat(((presentToday / totalStudents) * 100).toFixed(1))
       : 0;
 
-    // 3. Generate 7-day trend data (rates for last 7 days)
+    // 3. Generate 7-day trend data (rates and health metrics for last 7 days)
     const THAI_DAYS = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสฯ", "ศุกร์", "เสาร์"];
     
     const trendData = [];
+    const healthTrendData = [];
     for (let i = 6; i >= 0; i--) {
       const date = subDays(new Date(), i);
       const dayStart = startOfDay(date);
@@ -74,16 +75,38 @@ export async function GET(req: NextRequest) {
         return logDate >= dayStart && logDate < nextDayStart;
       });
 
+      // Calculate attendance rate
       const uniquePresent = new Set(dayLogs.map((log) => log.studentId)).size;
       const rate = totalStudents > 0 
         ? Math.round((uniquePresent / totalStudents) * 100) 
         : 0;
+
+      // Calculate unique student health states for this day (present or late only)
+      const dayHealthMap = new Map<string, string>();
+      dayLogs.forEach(log => {
+        if (log.status === "present" || log.status === "late") {
+          dayHealthMap.set(log.studentId, log.healthStatus || "normal");
+        }
+      });
+
+      let fever = 0;
+      let cough = 0;
+      dayHealthMap.forEach(status => {
+        if (status === "fever") fever++;
+        else if (status === "cough") cough++;
+      });
 
       const dayName = THAI_DAYS[date.getDay()];
 
       trendData.push({
         day: dayName,
         rate: rate,
+      });
+
+      healthTrendData.push({
+        day: dayName,
+        fever,
+        cough,
       });
     }
 
@@ -369,6 +392,7 @@ export async function GET(req: NextRequest) {
       lateToday,
       attendanceRate,
       trendData,
+      healthTrendData,
       recentScans,
       leaderboard,
       peakCheckinTimes,
