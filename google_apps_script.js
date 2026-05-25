@@ -45,6 +45,22 @@ function doPost(e) {
       }
     }
     
+    var leavesSheet = ss.getSheetByName("leaves");
+    if (!leavesSheet) {
+      leavesSheet = ss.insertSheet("leaves");
+      leavesSheet.appendRow(["id", "studentId", "studentName", "classroom", "startDate", "endDate", "type", "reason", "status", "submittedAt"]);
+    } else {
+      // Ensure headers exist for all columns (upgrade existing sheets dynamically)
+      var leavesHeaders = leavesSheet.getRange(1, 1, 1, leavesSheet.getLastColumn() || 10).getValues()[0];
+      var requiredLeavesHeaders = ["id", "studentId", "studentName", "classroom", "startDate", "endDate", "type", "reason", "status", "submittedAt"];
+      for (var h = 0; h < requiredLeavesHeaders.length; h++) {
+        var hName = requiredLeavesHeaders[h];
+        if (leavesHeaders.indexOf(hName) === -1) {
+          leavesSheet.getRange(1, leavesSheet.getLastColumn() + 1).setValue(hName);
+        }
+      }
+    }
+    
     if (action === "getStudents") {
       var data = studentSheet.getDataRange().getValues();
       var headers = data[0];
@@ -264,6 +280,88 @@ function doPost(e) {
       }
       result = { success: true };
       
+    } else if (action === "getLeaves") {
+      var data = leavesSheet.getDataRange().getValues();
+      var headers = data[0];
+      
+      var idxId = headers.indexOf("id");
+      var idxStudentId = headers.indexOf("studentId");
+      var idxStudentName = headers.indexOf("studentName");
+      var idxClassroom = headers.indexOf("classroom");
+      var idxStartDate = headers.indexOf("startDate");
+      var idxEndDate = headers.indexOf("endDate");
+      var idxType = headers.indexOf("type");
+      var idxReason = headers.indexOf("reason");
+      var idxStatus = headers.indexOf("status");
+      var idxSubmittedAt = headers.indexOf("submittedAt");
+      
+      var leaves = [];
+      for (var i = 1; i < data.length; i++) {
+        var row = data[i];
+        if (row[0] && String(row[idxId]).toLowerCase() !== "id") {
+          leaves.push({
+            id: String(row[idxId]),
+            studentId: idxStudentId !== -1 ? String(row[idxStudentId]) : "",
+            studentName: idxStudentName !== -1 ? String(row[idxStudentName]) : "",
+            classroom: idxClassroom !== -1 ? String(row[idxClassroom]) : "",
+            startDate: idxStartDate !== -1 ? String(row[idxStartDate]) : "",
+            endDate: idxEndDate !== -1 ? String(row[idxEndDate]) : "",
+            type: idxType !== -1 ? String(row[idxType]) : "personal",
+            reason: idxReason !== -1 ? String(row[idxReason]) : "",
+            status: idxStatus !== -1 ? String(row[idxStatus]) : "pending",
+            submittedAt: idxSubmittedAt !== -1 ? String(row[idxSubmittedAt]) : ""
+          });
+        }
+      }
+      result = { success: true, leaves: leaves };
+      
+    } else if (action === "addLeave") {
+      var record = postData.record;
+      var headers = leavesSheet.getRange(1, 1, 1, leavesSheet.getLastColumn() || 10).getValues()[0];
+      var nextRow = leavesSheet.getLastRow() + 1;
+      
+      var valuesMap = {
+        "id": record.id,
+        "studentId": record.studentId,
+        "studentName": record.studentName,
+        "classroom": record.classroom || "",
+        "startDate": record.startDate || "",
+        "endDate": record.endDate || "",
+        "type": record.type || "personal",
+        "reason": record.reason || "",
+        "status": record.status || "pending",
+        "submittedAt": record.submittedAt || new Date().toISOString()
+      };
+      
+      for (var c = 0; c < headers.length; c++) {
+        var header = headers[c];
+        if (valuesMap.hasOwnProperty(header)) {
+          leavesSheet.getRange(nextRow, c + 1).setValue(valuesMap[header]);
+        }
+      }
+      result = { success: true };
+      
+    } else if (action === "updateLeaveStatus") {
+      var id = postData.id;
+      var status = postData.status;
+      
+      var data = leavesSheet.getDataRange().getValues();
+      var headers = leavesSheet.getRange(1, 1, 1, leavesSheet.getLastColumn() || 10).getValues()[0];
+      var idxId = headers.indexOf("id");
+      var idxStatus = headers.indexOf("status");
+      
+      var updated = false;
+      if (idxId !== -1 && idxStatus !== -1) {
+        for (var i = 1; i < data.length; i++) {
+          if (String(data[i][idxId]) === String(id)) {
+            leavesSheet.getRange(i + 1, idxStatus + 1).setValue(status);
+            updated = true;
+            break;
+          }
+        }
+      }
+      result = { success: updated };
+      
     } else if (action === "reset") {
       // Clear data from students sheet except headers
       var lastRowStudents = studentSheet.getLastRow();
@@ -275,6 +373,15 @@ function doPost(e) {
       var lastRowAttendance = attendanceSheet.getLastRow();
       if (lastRowAttendance > 1) {
         attendanceSheet.deleteRows(2, lastRowAttendance - 1);
+      }
+      
+      // Clear data from leaves sheet except headers
+      var leavesSheet = ss.getSheetByName("leaves");
+      if (leavesSheet) {
+        var lastRowLeaves = leavesSheet.getLastRow();
+        if (lastRowLeaves > 1) {
+          leavesSheet.deleteRows(2, lastRowLeaves - 1);
+        }
       }
       
       result = { success: true };

@@ -955,6 +955,24 @@ export async function deleteTeacher(username: string): Promise<boolean> {
 
 // Get all leave requests
 export async function getLeaveRequests(): Promise<LeaveRequest[]> {
+  // 1. Try Google Sheets if active
+  if (isGoogleSheetsActive()) {
+    try {
+      const res = await callGoogleScript('getLeaves');
+      if (res && res.success && res.leaves) {
+        // Cache locally in background
+        try {
+          await ensureDbExists();
+          await fs.writeFile(LEAVES_FILE, JSON.stringify({ leaves: res.leaves }, null, 2));
+        } catch (e) {}
+        return res.leaves;
+      }
+    } catch (e) {
+      console.warn('Fallback to local storage for getLeaveRequests due to API error:', e);
+    }
+  }
+
+  // 2. Local fallback
   const release = await dbMutex.acquire();
   try {
     await ensureDbExists();
@@ -971,6 +989,28 @@ export async function getLeaveRequests(): Promise<LeaveRequest[]> {
 
 // Save leave request (Submit)
 export async function saveLeaveRequest(request: LeaveRequest): Promise<boolean> {
+  // 1. Try Google Sheets if active
+  if (isGoogleSheetsActive()) {
+    try {
+      const res = await callGoogleScript('addLeave', { record: request });
+      if (res && res.success) {
+        // Cache locally
+        try {
+          await ensureDbExists();
+          const data = await fs.readFile(LEAVES_FILE, 'utf-8');
+          const parsed = JSON.parse(data);
+          const leaves: LeaveRequest[] = parsed.leaves || [];
+          leaves.push(request);
+          await fs.writeFile(LEAVES_FILE, JSON.stringify({ leaves }, null, 2));
+        } catch (e) {}
+        return true;
+      }
+    } catch (e) {
+      console.warn('Failed to save leave request to Google Sheets, falling back to local storage:', e);
+    }
+  }
+
+  // 2. Local fallback
   const release = await dbMutex.acquire();
   try {
     await ensureDbExists();
@@ -993,6 +1033,16 @@ export async function updateLeaveRequestStatus(
   id: string,
   status: 'approved' | 'rejected'
 ): Promise<boolean> {
+  // 1. Try Google Sheets if active
+  if (isGoogleSheetsActive()) {
+    try {
+      await callGoogleScript('updateLeaveStatus', { id, status });
+    } catch (e) {
+      console.warn('Failed to sync leave status update to Google Sheets:', e);
+    }
+  }
+
+  // 2. Local execution
   const release = await dbMutex.acquire();
   try {
     await ensureDbExists();
