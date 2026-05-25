@@ -523,8 +523,10 @@ export default function SettingsPage() {
         body: JSON.stringify(settings)
       });
       if (res.ok) {
-        setProfileStatusMessage({ text: "✓ บันทึกข้อมูลโรงเรียนสำเร็จแล้ว!", type: "success" });
-        setTimeout(() => setProfileStatusMessage(null), 3000);
+        setProfileStatusMessage({ text: "✓ บันทึกข้อมูลโรงเรียนสำเร็จแล้ว! (กำลังโหลดข้อมูลใหม่...)", type: "success" });
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
       } else {
         const errData = await res.json().catch(() => ({}));
         setProfileStatusMessage({ text: errData.error || "เกิดข้อผิดพลาดในการบันทึกข้อมูล", type: "error" });

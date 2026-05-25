@@ -26,6 +26,7 @@ async function callGoogleScript(action: string, extraData: any = {}): Promise<an
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ action, ...extraData }),
+      cache: 'no-store'
     });
 
     if (response.ok) {
