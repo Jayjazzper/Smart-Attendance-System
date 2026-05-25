@@ -24,7 +24,7 @@ export default async function Home() {
             💻 AI + Vibe Coding
           </span>
         )}
-        <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+        <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent py-3 leading-normal">
           ระบบเช็คชื่ออัจฉริยะด้วยใบหน้า
         </h1>
         <p className="text-sm font-bold text-blue-600 dark:text-blue-400">
