@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
+import AdminGuard from "@/components/AdminGuard";
 
 const LEVELS = [
   { value: "kindergarten", label: "ระดับอนุบาล" },
@@ -88,6 +89,7 @@ export default function EditStudentPage() {
     division: "primary" as "kindergarten" | "primary" | "secondary",
     grade: "ประถมศึกษาปีที่ 1",
     room: "ห้อง 1",
+    parentLineId: "",
   });
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
@@ -109,6 +111,7 @@ export default function EditStudentPage() {
             division: student.level || "primary",
             grade: parsed.grade,
             room: parsed.room,
+            parentLineId: student.parentLineId || "",
           });
         } else {
           setErrorMessage("ไม่สามารถดึงข้อมูลนักเรียนรหัสนี้ได้");
@@ -161,6 +164,7 @@ export default function EditStudentPage() {
           email: formData.email,
           classroom: getAbbreviatedClassroom(formData.grade, formData.room),
           level: formData.division,
+          parentLineId: formData.parentLineId,
         }),
       });
 
@@ -182,7 +186,8 @@ export default function EditStudentPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 py-6 animate-fade-in max-w-xl mx-auto w-full">
+    <AdminGuard>
+      <div className="flex flex-col gap-6 py-6 animate-fade-in max-w-xl mx-auto w-full">
       {/* Title */}
       <div className="flex items-center gap-3">
         <Link
@@ -256,6 +261,29 @@ export default function EditStudentPage() {
                 disabled={status === "saving" || status === "success"}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm placeholder-slate-400 focus:border-blue-500 focus:outline-none transition-colors"
               />
+            </div>
+
+            {/* Parent LINE User ID */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between">
+                <label htmlFor="parentLineId" className="text-xs font-bold text-slate-700">
+                  รหัส LINE User ID ผู้ปกครอง (สำหรับแจ้งเตือนส่วนตัว)
+                </label>
+                <span className="text-[10px] text-blue-600 font-semibold">ไม่บังคับ (Optional)</span>
+              </div>
+              <input
+                type="text"
+                id="parentLineId"
+                name="parentLineId"
+                placeholder="เช่น U1234567890abcdef1234567890abcdef"
+                value={formData.parentLineId}
+                onChange={handleChange}
+                disabled={status === "saving" || status === "success"}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm placeholder-slate-400 focus:border-blue-500 focus:outline-none transition-colors"
+              />
+              <p className="text-[9px] text-slate-400 font-semibold leading-relaxed">
+                รหัสขึ้นต้นด้วย U ตามด้วยตัวเลขและตัวอักษรภาษาอังกฤษ 32 หลัก สำหรับส่งแจ้งเตือนรายบุคคลผ่าน LINE OA Push
+              </p>
             </div>
 
             {/* Division & Grade & Room */}
@@ -346,6 +374,7 @@ export default function EditStudentPage() {
           </form>
         )}
       </div>
-    </div>
+      </div>
+    </AdminGuard>
   );
 }

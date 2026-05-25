@@ -201,6 +201,54 @@ function doPost(e) {
       }
       
       result = { success: true };
+      
+    } else if (action === "getSettings") {
+      var settingsSheet = ss.getSheetByName("settings");
+      if (!settingsSheet) {
+        settingsSheet = ss.insertSheet("settings");
+        settingsSheet.appendRow(["key", "value"]);
+      }
+      var data = settingsSheet.getDataRange().getValues();
+      var settingsStr = "";
+      for (var i = 1; i < data.length; i++) {
+        if (data[i][0] === "config") {
+          settingsStr = data[i][1];
+          break;
+        }
+      }
+      var settingsObj = {};
+      if (settingsStr) {
+        try {
+          settingsObj = JSON.parse(settingsStr);
+        } catch(e) {
+          console.error("Error parsing settings:", e);
+        }
+      }
+      result = { success: true, settings: settingsObj };
+      
+    } else if (action === "saveSettings") {
+      var settingsSheet = ss.getSheetByName("settings");
+      if (!settingsSheet) {
+        settingsSheet = ss.insertSheet("settings");
+        settingsSheet.appendRow(["key", "value"]);
+      }
+      var settings = postData.settings;
+      var settingsStr = JSON.stringify(settings);
+      var data = settingsSheet.getDataRange().getValues();
+      var foundRow = -1;
+      for (var i = 1; i < data.length; i++) {
+        if (data[i][0] === "config") {
+          foundRow = i + 1;
+          break;
+        }
+      }
+      
+      if (foundRow !== -1) {
+        settingsSheet.getRange(foundRow, 2).setValue(settingsStr);
+      } else {
+        settingsSheet.appendRow(["config", settingsStr]);
+      }
+      result = { success: true };
     }
     
   } catch (error) {

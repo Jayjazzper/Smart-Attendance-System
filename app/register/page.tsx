@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
+import AdminGuard from "@/components/AdminGuard";
 
 const LEVELS = [
   { value: "kindergarten", label: "ระดับอนุบาล" },
@@ -71,6 +72,7 @@ export default function RegisterPage() {
     grade: "ประถมศึกษาปีที่ 1",
     room: "ห้อง 1",
     consent: false,
+    parentLineId: "",
   });
   const [status, setStatus] = useState<"idle" | "capturing" | "scanning" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
@@ -110,6 +112,7 @@ export default function RegisterPage() {
           consentGiven: formData.consent,
           classroom: getAbbreviatedClassroom(formData.grade, formData.room),
           level: formData.division,
+          parentLineId: formData.parentLineId,
         }),
       });
 
@@ -145,7 +148,8 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 py-6 animate-fade-in">
+    <AdminGuard>
+      <div className="flex flex-col gap-6 py-6 animate-fade-in">
       {/* Title */}
       <div className="flex flex-col gap-1.5">
         <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
@@ -215,6 +219,29 @@ export default function RegisterPage() {
                   disabled={status === "capturing" || status === "scanning" || status === "success"}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm placeholder-slate-400 focus:border-blue-500 focus:outline-none transition-colors"
                 />
+              </div>
+
+              {/* Parent LINE User ID */}
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="parentLineId" className="text-xs font-bold text-slate-700">
+                    รหัส LINE User ID ผู้ปกครอง (สำหรับแจ้งเตือนส่วนตัว)
+                  </label>
+                  <span className="text-[10px] text-blue-600 font-semibold">ไม่บังคับ (Optional)</span>
+                </div>
+                <input
+                  type="text"
+                  id="parentLineId"
+                  name="parentLineId"
+                  placeholder="เช่น U1234567890abcdef1234567890abcdef"
+                  value={formData.parentLineId}
+                  onChange={handleChange}
+                  disabled={status === "capturing" || status === "scanning" || status === "success"}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm placeholder-slate-400 focus:border-blue-500 focus:outline-none transition-colors"
+                />
+                <p className="text-[9px] text-slate-400 font-semibold leading-relaxed">
+                  รหัสขึ้นต้นด้วย U ตามด้วยตัวเลขและตัวอักษรภาษาอังกฤษ 32 หลัก สำหรับแจ้งเตือนผู้ปกครองรายบุคคล
+                </p>
               </div>
 
               {/* Division & Grade & Room */}
@@ -326,6 +353,7 @@ export default function RegisterPage() {
                         grade: "ประถมศึกษาปีที่ 1",
                         room: "ห้อง 1",
                         consent: false,
+                        parentLineId: "",
                       });
                       setStatus("idle");
                     }}
@@ -376,5 +404,6 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+    </AdminGuard>
   );
 }

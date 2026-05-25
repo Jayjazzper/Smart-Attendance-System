@@ -33,6 +33,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // If it's a test line push notification request
+    if (body.action === "testLinePush") {
+      const { accessToken, testUserId } = body;
+      if (!accessToken || !testUserId) {
+        return NextResponse.json({ error: "กรุณาระบุ Channel Access Token และ User ID สำหรับทดสอบ" }, { status: 400 });
+      }
+
+      const message = "📢 ข้อความทดสอบเชื่อมต่อ LINE OA Push Notification จากระบบเช็คชื่ออัจฉริยะ Smart Attendance System สำเร็จแล้ว!";
+      const success = await sendLinePush(accessToken, testUserId, message);
+      if (success) {
+        return NextResponse.json({ success: true, message: "ส่งข้อความทดสอบแบบ Push สำเร็จแล้ว" });
+      } else {
+        return NextResponse.json({ error: "ส่งข้อความ Push ไม่สำเร็จ กรุณาตรวจสอบ Token และ User ID" }, { status: 400 });
+      }
+    }
+
     // Otherwise, it's a settings save request
     const success = await saveSettings(body);
     if (success) {
@@ -59,6 +75,26 @@ async function sendLineNotify(token: string, message: string): Promise<boolean> 
     return res.ok;
   } catch (error) {
     console.error("sendLineNotify error:", error);
+    return false;
+  }
+}
+
+async function sendLinePush(accessToken: string, toUserId: string, text: string): Promise<boolean> {
+  try {
+    const res = await fetch("https://api.line.me/v2/bot/message/push", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`
+      },
+      body: JSON.stringify({
+        to: toUserId,
+        messages: [{ type: "text", text }]
+      })
+    });
+    return res.ok;
+  } catch (error) {
+    console.error("sendLinePush error:", error);
     return false;
   }
 }

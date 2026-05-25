@@ -7,6 +7,7 @@ export interface Student {
   registeredAt: string; // ISO format string
   classroom?: string; // e.g., "ป.4/2"
   level?: 'kindergarten' | 'primary' | 'secondary';
+  parentLineId?: string;
 }
 
 export interface Attendance {

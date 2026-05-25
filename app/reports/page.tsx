@@ -13,6 +13,7 @@ import {
   isSameDay 
 } from "date-fns";
 import { Student, Attendance, LeaveRequest } from "@/lib/types";
+import AdminGuard from "@/components/AdminGuard";
 
 interface StudentReportStats {
   student: Student;
@@ -40,6 +41,7 @@ export default function ReportsPage() {
   const [dateOption, setDateOption] = useState<"today" | "last7" | "thisMonth" | "custom">("last7");
   const [customStartDate, setCustomStartDate] = useState(format(subDays(new Date(), 6), "yyyy-MM-dd"));
   const [customEndDate, setCustomEndDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [lockedClassroom, setLockedClassroom] = useState<string | null>(null);
 
   // Manual Log Modal State
   const [showManualModal, setShowManualModal] = useState(false);
@@ -79,6 +81,17 @@ export default function ReportsPage() {
 
   useEffect(() => {
     fetchData();
+    const savedSession = localStorage.getItem("teacherSession");
+    if (savedSession) {
+      try {
+        const parsed = JSON.parse(savedSession);
+        if (parsed.role === "teacher" && parsed.classroom) {
+          setLockedClassroom(parsed.classroom);
+          setSelectedClassroom(parsed.classroom);
+          setSelectedLevel("all");
+        }
+      } catch (e) {}
+    }
   }, []);
 
   // 2. Compute date range endpoints based on dateOption selection
@@ -133,8 +146,10 @@ export default function ReportsPage() {
 
   // Reset classroom selection when division level changes
   useEffect(() => {
-    setSelectedClassroom("all");
-  }, [selectedLevel]);
+    if (!lockedClassroom) {
+      setSelectedClassroom("all");
+    }
+  }, [selectedLevel, lockedClassroom]);
 
   // 4. Calculate individual student statistics
   const studentsStats: StudentReportStats[] = filteredStudents.map(student => {
@@ -411,7 +426,8 @@ export default function ReportsPage() {
   });
 
   return (
-    <div className="flex flex-col gap-6 py-6 animate-fade-in relative">
+    <AdminGuard allowTeacher>
+      <div className="flex flex-col gap-6 py-6 animate-fade-in relative">
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex flex-col gap-1.5">
@@ -492,7 +508,8 @@ export default function ReportsPage() {
             <select
               value={selectedLevel}
               onChange={(e) => setSelectedLevel(e.target.value as any)}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-blue-500 focus:outline-none transition-colors"
+              disabled={!!lockedClassroom}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-blue-500 focus:outline-none transition-colors disabled:bg-slate-50 disabled:text-slate-400"
             >
               <option value="all">ทุกระดับชั้น</option>
               <option value="kindergarten">ระดับอนุบาล</option>
@@ -507,12 +524,19 @@ export default function ReportsPage() {
             <select
               value={selectedClassroom}
               onChange={(e) => setSelectedClassroom(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-blue-500 focus:outline-none transition-colors"
+              disabled={!!lockedClassroom}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-blue-500 focus:outline-none transition-colors disabled:bg-slate-50 disabled:text-slate-400"
             >
-              <option value="all">ทั้งหมด</option>
-              {availableClassrooms.map((cls) => (
-                <option key={cls} value={cls}>{cls}</option>
-              ))}
+              {lockedClassroom ? (
+                <option value={lockedClassroom}>{lockedClassroom}</option>
+              ) : (
+                <>
+                  <option value="all">ทั้งหมด</option>
+                  {availableClassrooms.map((cls) => (
+                    <option key={cls} value={cls}>{cls}</option>
+                  ))}
+                </>
+              )}
             </select>
           </div>
 
@@ -952,5 +976,6 @@ export default function ReportsPage() {
         </div>
       )}
     </div>
+    </AdminGuard>
   );
 }

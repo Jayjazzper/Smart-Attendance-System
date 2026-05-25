@@ -57,14 +57,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Optional: Trigger LINE Notify if token exists for this classroom
+    // 3. Optional: Trigger LINE Notify and LINE OA Push if token/credentials exist
     try {
       const settings = await getSettings();
+      
+      // LINE Notify (Group-level broadcast)
       const classSettings = settings.classrooms?.[recordClassroom];
       if (classSettings?.lineToken) {
-        // Run asynchronously without awaiting so the client gets response quickly
         triggerLineNotification(classSettings.lineToken, newRecord).catch(err => {
           console.error("Async LINE notify error:", err);
+        });
+      }
+
+      // LINE OA Push (Personal direct message)
+      if (settings.lineChannelAccessToken && student.parentLineId) {
+        triggerLineOAPushNotification(settings.lineChannelAccessToken, student.parentLineId, newRecord).catch(err => {
+          console.error("Async LINE OA Push error:", err);
         });
       }
     } catch (err) {
@@ -115,5 +123,60 @@ async function triggerLineNotification(token: string, record: any) {
     });
   } catch (error) {
     console.error("Error sending LINE Notify message:", error);
+  }
+}
+
+async function triggerLineOAPushNotification(accessToken: string, toUserId: string, record: any) {
+  try {
+    const statusMap = {
+      present: "มาเรียนปกติ ✓",
+      late: "มาเรียนสาย ⚠️",
+      absent: "ขาดเรียน ❌",
+      leave: "ลาเรียน ✉️",
+    };
+    const statusText = statusMap[record.status as keyof typeof statusMap] || record.status;
+    const timestamp = record.timestamp ? new Date(record.timestamp) : new Date();
+    
+    const timeStr = timestamp.toLocaleTimeString("th-TH", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Bangkok",
+    });
+    const dateStr = timestamp.toLocaleDateString("th-TH", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "Asia/Bangkok",
+    });
+
+    const message = `📢 รายงานการเช็คชื่อเรียนของบุตรหลาน\n👤 บุตรหลาน: ${record.studentName}\n🆔 รหัสประจำตัว: ${record.studentId}\n🏫 ห้องเรียน: ${record.classroom || "-"}\n📅 วันที่: ${dateStr}\n⏰ เวลา: ${timeStr} น.\n📌 สถานะ: ${statusText}`;
+
+    const payload = {
+      to: toUserId,
+      messages: [
+        {
+          type: "text",
+          text: message
+        }
+      ]
+    };
+
+    const res = await fetch("https://api.line.me/v2/bot/message/push", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error(`LINE OA Push API failed with status ${res.status}:`, errorText);
+    }
+  } catch (error) {
+    console.error("Error sending LINE OA Push message:", error);
   }
 }

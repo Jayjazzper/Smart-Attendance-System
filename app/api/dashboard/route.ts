@@ -8,12 +8,18 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const levelFilter = searchParams.get("level"); // 'kindergarten' | 'primary' | 'secondary' or 'all'/null
+    const classroomFilter = searchParams.get("classroom"); // e.g. 'ป.4/2'
 
     let students = await getStudents();
     let attendance = await getAttendance();
 
-    // Apply division level filter if specified and not "all"
-    if (levelFilter && levelFilter !== "all") {
+    // Apply classroom filter if specified
+    if (classroomFilter) {
+      students = students.filter(s => s.classroom === classroomFilter);
+      const studentIds = new Set(students.map(s => s.id));
+      attendance = attendance.filter(log => studentIds.has(log.studentId));
+    } else if (levelFilter && levelFilter !== "all") {
+      // Apply division level filter if specified and not "all"
       students = students.filter(s => s.level === levelFilter);
       const studentIds = new Set(students.map(s => s.id));
       attendance = attendance.filter(log => studentIds.has(log.studentId));
@@ -81,7 +87,88 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // 4. Fetch the 10 most recent check-in logs
+    // 4. Calculate classroom leaderboard (attendance rate today)
+    const classrooms = Array.from(new Set(students.map(s => s.classroom).filter(Boolean))) as string[];
+    const leaderboard = classrooms.map(cls => {
+      const classStudents = students.filter(s => s.classroom === cls);
+      const total = classStudents.length;
+      
+      const classStudentIds = new Set(classStudents.map(s => s.id));
+      const classTodayLogs = todayLogs.filter(log => classStudentIds.has(log.studentId));
+      
+      const uniquePresent = new Set(
+        classTodayLogs
+          .filter(log => log.status === "present" || log.status === "late")
+          .map(log => log.studentId)
+      ).size;
+
+      const uniqueLate = new Set(
+        classTodayLogs
+          .filter(log => log.status === "late")
+          .map(log => log.studentId)
+      ).size;
+
+      const uniqueLeave = new Set(
+        classTodayLogs
+          .filter(log => log.status === "leave")
+          .map(log => log.studentId)
+      ).size;
+
+      const rate = total > 0 ? parseFloat(((uniquePresent / total) * 100).toFixed(1)) : 0;
+      
+      return {
+        classroom: cls,
+        total,
+        present: uniquePresent,
+        late: uniqueLate,
+        leave: uniqueLeave,
+        rate
+      };
+    }).sort((a, b) => b.rate - a.rate);
+
+    // 5. Calculate peak arrival times distribution
+    const peakBrackets = {
+      "ก่อน 07:30": 0,
+      "07:30 - 07:45": 0,
+      "07:45 - 08:00": 0,
+      "หลัง 08:00": 0
+    };
+
+    const studentEarliestScan = new Map<string, Date>();
+    todayLogs.forEach(log => {
+      if (log.status === "leave" || log.status === "absent") return;
+      const logDate = new Date(log.timestamp);
+      const existing = studentEarliestScan.get(log.studentId);
+      if (!existing || logDate < existing) {
+        studentEarliestScan.set(log.studentId, logDate);
+      }
+    });
+
+    studentEarliestScan.forEach((logDate) => {
+      const timeStr = logDate.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+        timeZone: "Asia/Bangkok"
+      });
+
+      if (timeStr < "07:30") {
+        peakBrackets["ก่อน 07:30"]++;
+      } else if (timeStr < "07:45") {
+        peakBrackets["07:30 - 07:45"]++;
+      } else if (timeStr < "08:00") {
+        peakBrackets["07:45 - 08:00"]++;
+      } else {
+        peakBrackets["หลัง 08:00"]++;
+      }
+    });
+
+    const peakCheckinTimes = Object.entries(peakBrackets).map(([name, count]) => ({
+      name,
+      count
+    }));
+
+    // 6. Fetch the 10 most recent check-in logs
     const recentScans = [...attendance]
       .reverse() // show latest first
       .slice(0, 10)
@@ -107,6 +194,8 @@ export async function GET(req: NextRequest) {
       attendanceRate,
       trendData,
       recentScans,
+      leaderboard,
+      peakCheckinTimes,
     });
   } catch (error) {
     console.error("GET /api/dashboard error:", error);

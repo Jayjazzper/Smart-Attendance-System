@@ -33,9 +33,15 @@ export default function CheckInPage() {
   const [homeroomTime, setHomeroomTime] = useState("08:00");
   const [lateLimitTime, setLateLimitTime] = useState("08:30");
 
+  // Connection states
+  const [isOnline, setIsOnline] = useState(true);
+  const [offlineQueueCount, setOfflineQueueCount] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // 1. Fetch recent scan history on load
   const fetchRecentLogs = async () => {
     try {
+      if (!navigator.onLine) return; // skip if offline
       const res = await fetch("/api/attendance");
       if (res.ok) {
         const data = await res.json();
@@ -62,8 +68,97 @@ export default function CheckInPage() {
     }
   };
 
+  // Sync function
+  const syncOfflineScans = async () => {
+    if (!navigator.onLine || isSyncing) return;
+    const queued = localStorage.getItem("offlineScans");
+    if (!queued) {
+      setOfflineQueueCount(0);
+      return;
+    }
+
+    try {
+      const scans = JSON.parse(queued);
+      if (!Array.isArray(scans) || scans.length === 0) {
+        localStorage.removeItem("offlineScans");
+        setOfflineQueueCount(0);
+        return;
+      }
+
+      setIsSyncing(true);
+      console.log(`Syncing ${scans.length} offline scans to server...`);
+      
+      for (const scan of scans) {
+        await fetch("/api/attendance", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(scan),
+        });
+      }
+
+      localStorage.removeItem("offlineScans");
+      setOfflineQueueCount(0);
+      fetchRecentLogs();
+      console.log("Offline scans successfully synced!");
+    } catch (err) {
+      console.error("Failed to sync offline scans:", err);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Handle local state updates from storage queue
+  const updateQueueCount = () => {
+    const queued = localStorage.getItem("offlineScans");
+    if (queued) {
+      try {
+        const parsed = JSON.parse(queued);
+        setOfflineQueueCount(Array.isArray(parsed) ? parsed.length : 0);
+      } catch (e) {
+        setOfflineQueueCount(0);
+      }
+    } else {
+      setOfflineQueueCount(0);
+    }
+  };
+
   useEffect(() => {
     fetchRecentLogs();
+    
+    // Set initial connection status
+    setIsOnline(navigator.onLine);
+    updateQueueCount();
+
+    // Event listeners for online/offline status
+    const handleOnline = () => {
+      setIsOnline(true);
+      syncOfflineScans();
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+    const handleQueueChange = () => {
+      updateQueueCount();
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    window.addEventListener("offline-scan-queued", handleQueueChange);
+
+    // Interval worker to check and sync every 10 seconds
+    const interval = setInterval(() => {
+      updateQueueCount();
+      if (navigator.onLine) {
+        syncOfflineScans();
+      }
+    }, 10000);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+      window.removeEventListener("offline-scan-queued", handleQueueChange);
+      clearInterval(interval);
+    };
   }, []);
 
   // 2. Callback when face matching finishes processing a frame
@@ -119,7 +214,35 @@ export default function CheckInPage() {
         </p>
       </div>
 
-      {/* Main Container Layout */}
+      {/* Offline/Sync Banner */}
+      {!isOnline && (
+        <div className="rounded-2xl border border-red-100 bg-red-50 p-4 shadow-sm flex items-center gap-3 animate-pulse">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-red-500 text-white">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.5M5 12.5a10.94 10.94 0 0 1 5.83-2.84M8.5 16.5a4.92 4.92 0 0 1 2-1M16.5 16.5a4.9 4.9 0 0 1-1.34 1.77M12 20h.01"/></svg>
+          </div>
+          <div className="flex flex-col">
+            <h4 className="text-xs font-bold text-red-900">📴 ระบบทำงานในโหมดออฟไลน์</h4>
+            <p className="text-[10px] font-semibold text-red-700 mt-0.5">
+              สัญญาณอินเทอร์เน็ตขาดหาย ตัวสแกนจะบันทึกสถิติลงในเครื่องชั่วคราว (เก็บในคิว {offlineQueueCount} รายการ) และจะส่งข้อมูลเข้าไลน์ทันทีเมื่อเน็ตกลับมาต่อติด
+            </p>
+          </div>
+        </div>
+      )}
+
+      {isOnline && offlineQueueCount > 0 && (
+        <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 shadow-sm flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white animate-spin">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+          </div>
+          <div className="flex flex-col">
+            <h4 className="text-xs font-bold text-amber-900">🔄 กำลังเชื่อมต่อระบบและซิงค์ข้อมูล...</h4>
+            <p className="text-[10px] font-semibold text-amber-700 mt-0.5">
+              กำลังนำประวัติการสแกนออฟไลน์จำนวน {offlineQueueCount} รายการ ส่งขึ้นฐานข้อมูลกลางและอัปเดตแจ้งเตือนทาง LINE ย้อนหลังให้โดยอัตโนมัติ
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Main Container Layout */}
       <div className="grid gap-8 lg:grid-cols-12 mt-2">
         {/* Left Side: Webcam Frame & Settings */}

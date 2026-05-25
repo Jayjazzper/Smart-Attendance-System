@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Student } from "@/lib/types";
+import AdminGuard from "@/components/AdminGuard";
 
 export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -11,6 +12,7 @@ export default function StudentsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [levelFilter, setLevelFilter] = useState<"all" | "kindergarten" | "primary" | "secondary">("all");
+  const [lockedClassroom, setLockedClassroom] = useState<string | null>(null);
 
   // 1. Fetch live students from API
   const fetchStudents = async () => {
@@ -29,6 +31,15 @@ export default function StudentsPage() {
 
   useEffect(() => {
     fetchStudents();
+    const savedSession = localStorage.getItem("teacherSession");
+    if (savedSession) {
+      try {
+        const parsed = JSON.parse(savedSession);
+        if (parsed.role === "teacher" && parsed.classroom) {
+          setLockedClassroom(parsed.classroom);
+        }
+      } catch (e) {}
+    }
   }, []);
 
   // Search and Level filter
@@ -39,8 +50,9 @@ export default function StudentsPage() {
       s.email.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesLevel = levelFilter === "all" || s.level === levelFilter;
+    const matchesClassroom = !lockedClassroom || s.classroom === lockedClassroom;
     
-    return matchesSearch && matchesLevel;
+    return matchesSearch && matchesLevel && matchesClassroom;
   });
 
   // 2. Perform actual deletion request to Next.js API route
@@ -68,7 +80,8 @@ export default function StudentsPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 py-6 animate-fade-in relative">
+    <AdminGuard>
+      <div className="flex flex-col gap-6 py-6 animate-fade-in relative">
       {/* Upper header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex flex-col gap-1.5">
@@ -117,32 +130,38 @@ export default function StudentsPage() {
                 <line x1="21" y1="21" x2="16.65" y2="16.65" />
               </svg>
             </div>
-            <span className="text-xs font-bold text-slate-400">
-              แสดง {filteredStudents.length} จาก {students.length} รายการ
+             <span className="text-xs font-bold text-slate-400">
+              แสดง {filteredStudents.length} จาก {lockedClassroom ? students.filter(s => s.classroom === lockedClassroom).length : students.length} รายการ
             </span>
           </div>
 
-          {/* Level Filters */}
-          <div className="flex items-center gap-1.5 overflow-x-auto">
-            {[
-              { id: "all", label: "ทุกระดับชั้น" },
-              { id: "kindergarten", label: "อนุบาล" },
-              { id: "primary", label: "ประถม" },
-              { id: "secondary", label: "มัธยม" }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setLevelFilter(tab.id as any)}
-                className={`rounded-xl px-3 py-1.5 text-[11px] font-bold transition-all border whitespace-nowrap cursor-pointer ${
-                  levelFilter === tab.id
-                    ? "bg-blue-600 border-blue-600 text-white shadow-sm"
-                    : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          {/* Level Filters / Classroom Lock Status */}
+          {lockedClassroom ? (
+            <span className="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 border border-amber-200 px-3 py-1.5 text-[11px] font-bold text-amber-800 shadow-sm whitespace-nowrap">
+              เฉพาะห้องเรียน {lockedClassroom}
+            </span>
+          ) : (
+            <div className="flex items-center gap-1.5 overflow-x-auto">
+              {[
+                { id: "all", label: "ทุกระดับชั้น" },
+                { id: "kindergarten", label: "อนุบาล" },
+                { id: "primary", label: "ประถม" },
+                { id: "secondary", label: "มัธยม" }
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setLevelFilter(tab.id as any)}
+                  className={`rounded-xl px-3 py-1.5 text-[11px] font-bold transition-all border whitespace-nowrap cursor-pointer ${
+                    levelFilter === tab.id
+                      ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                      : "bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Table list */}
@@ -275,6 +294,7 @@ export default function StudentsPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </AdminGuard>
   );
 }

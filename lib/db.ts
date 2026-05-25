@@ -154,18 +154,33 @@ export async function saveStudent(student: Student): Promise<boolean> {
   }
 }
 
+export async function saveAllStudents(students: Student[]): Promise<boolean> {
+  const release = await dbMutex.acquire();
+  try {
+    await ensureDbExists();
+    await fs.writeFile(STUDENTS_FILE, JSON.stringify({ students }, null, 2));
+    return true;
+  } catch (error) {
+    console.error('Error saving all students:', error);
+    return false;
+  } finally {
+    release();
+  }
+}
+
 // Update student details
 export async function updateStudent(
   id: string,
   name: string,
   email: string,
   classroom?: string,
-  level?: 'kindergarten' | 'primary' | 'secondary'
+  level?: 'kindergarten' | 'primary' | 'secondary',
+  parentLineId?: string
 ): Promise<boolean> {
   // 1. Try Google Sheets Web App if active
   if (isGoogleSheetsActive()) {
     try {
-      const res = await callGoogleScript('updateStudent', { id, name, email, classroom, level });
+      const res = await callGoogleScript('updateStudent', { id, name, email, classroom, level, parentLineId });
       if (res) {
         return !!res.success;
       }
@@ -189,6 +204,7 @@ export async function updateStudent(
     students[index].email = email;
     if (classroom !== undefined) students[index].classroom = classroom;
     if (level !== undefined) students[index].level = level;
+    if (parentLineId !== undefined) students[index].parentLineId = parentLineId;
 
     await fs.writeFile(STUDENTS_FILE, JSON.stringify({ students }, null, 2));
 
@@ -381,28 +397,93 @@ export interface ClassroomSetting {
 
 export interface SystemSettings {
   classrooms: Record<string, ClassroomSetting>;
+  lineChannelAccessToken?: string;
+  teacherPasscode?: string;
+  adminPasscode?: string;
+  schoolName?: string;
+  schoolDistrict?: string;
+  schoolLogo?: string;
 }
 
 export async function getSettings(): Promise<SystemSettings> {
+  // 1. Try Google Sheets Web App if active
+  if (isGoogleSheetsActive()) {
+    try {
+      const res = await callGoogleScript('getSettings');
+      if (res && res.success && res.settings) {
+        const parsed = res.settings;
+        return {
+          classrooms: parsed.classrooms || {},
+          lineChannelAccessToken: parsed.lineChannelAccessToken || "",
+          teacherPasscode: parsed.teacherPasscode || "1234",
+          adminPasscode: parsed.adminPasscode || "1234",
+          schoolName: parsed.schoolName || process.env.NEXT_PUBLIC_SCHOOL_NAME || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)",
+          schoolDistrict: parsed.schoolDistrict || process.env.NEXT_PUBLIC_SCHOOL_DISTRICT || "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1",
+          schoolLogo: parsed.schoolLogo || ""
+        };
+      }
+    } catch (e) {
+      console.warn('Fallback to local JSON storage for getSettings due to API error:', e);
+    }
+  }
+
+  // 2. Fallback to local files
   const release = await dbMutex.acquire();
   try {
     await ensureDbExists();
     try {
       await fs.access(SETTINGS_FILE);
     } catch {
-      await fs.writeFile(SETTINGS_FILE, JSON.stringify({ classrooms: {} }, null, 2));
+      await fs.writeFile(SETTINGS_FILE, JSON.stringify({ classrooms: {}, lineChannelAccessToken: "", teacherPasscode: "1234", adminPasscode: "1234" }, null, 2));
     }
     const data = await fs.readFile(SETTINGS_FILE, 'utf-8');
-    return JSON.parse(data) as SystemSettings;
+    const parsed = JSON.parse(data) as SystemSettings;
+    return {
+      classrooms: parsed.classrooms || {},
+      lineChannelAccessToken: parsed.lineChannelAccessToken || "",
+      teacherPasscode: parsed.teacherPasscode || "1234",
+      adminPasscode: parsed.adminPasscode || "1234",
+      schoolName: parsed.schoolName || process.env.NEXT_PUBLIC_SCHOOL_NAME || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)",
+      schoolDistrict: parsed.schoolDistrict || process.env.NEXT_PUBLIC_SCHOOL_DISTRICT || "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1",
+      schoolLogo: parsed.schoolLogo || ""
+    };
   } catch (error) {
     console.error('Error reading settings:', error);
-    return { classrooms: {} };
+    return {
+      classrooms: {},
+      lineChannelAccessToken: "",
+      teacherPasscode: "1234",
+      adminPasscode: "1234",
+      schoolName: process.env.NEXT_PUBLIC_SCHOOL_NAME || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)",
+      schoolDistrict: process.env.NEXT_PUBLIC_SCHOOL_DISTRICT || "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1",
+      schoolLogo: ""
+    };
   } finally {
     release();
   }
 }
 
 export async function saveSettings(settings: SystemSettings): Promise<boolean> {
+  // 1. Try Google Sheets Web App if active
+  if (isGoogleSheetsActive()) {
+    try {
+      const res = await callGoogleScript('saveSettings', { settings });
+      if (res && res.success) {
+        // Also save locally as local cache/fallback if possible
+        try {
+          await ensureDbExists();
+          await fs.writeFile(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+        } catch (e) {
+          // Ignore local write failure on serverless like Vercel
+        }
+        return true;
+      }
+    } catch (e) {
+      console.warn('Fallback to local JSON storage for saveSettings due to API error:', e);
+    }
+  }
+
+  // 2. Fallback to local files
   const release = await dbMutex.acquire();
   try {
     await ensureDbExists();

@@ -51,10 +51,24 @@ export default function FaceDetector({
         setModelsLoaded(true);
 
         // Fetch students list
-        const res = await fetch("/api/students");
-        if (res.ok) {
-          const data = await res.json();
-          setStudents(data.students || []);
+        try {
+          const res = await fetch("/api/students");
+          if (res.ok) {
+            const data = await res.json();
+            const list = data.students || [];
+            setStudents(list);
+            localStorage.setItem("cachedStudents", JSON.stringify(list));
+          } else {
+            throw new Error("HTTP failure");
+          }
+        } catch (studentErr) {
+          const cached = localStorage.getItem("cachedStudents");
+          if (cached) {
+            setStudents(JSON.parse(cached));
+            console.log("Loaded student registry from offline localStorage cache");
+          } else {
+            throw studentErr;
+          }
         }
       } catch (err) {
         console.error("Initialization error:", err);
@@ -182,18 +196,39 @@ export default function FaceDetector({
           checkInStatus = "late";
         }
         
-        // Post attendance record to API
+        // Post attendance record to API or queue locally if offline
         const confidenceScore = Math.round((1 - minDistance) * 100);
-        await fetch("/api/attendance", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            studentId: matchedStudent.id,
-            confidence: confidenceScore,
-            status: checkInStatus,
-            classroom: matchedStudent.classroom || "",
-          }),
-        });
+        const scanPayload = {
+          studentId: matchedStudent.id,
+          confidence: confidenceScore,
+          status: checkInStatus,
+          classroom: matchedStudent.classroom || "",
+          timestamp: new Date().toISOString()
+        };
+
+        try {
+          if (!navigator.onLine) {
+            throw new Error("ระบบอยู่ในสถานะออฟไลน์");
+          }
+          const res = await fetch("/api/attendance", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(scanPayload),
+          });
+          if (!res.ok) {
+            throw new Error("HTTP connection failed");
+          }
+        } catch (err) {
+          console.warn("สแกนใบหน้าล้มเหลว (บันทึกออฟไลน์):", err);
+          // Save in localStorage queue
+          const existing = localStorage.getItem("offlineScans");
+          const scans = existing ? JSON.parse(existing) : [];
+          scans.push(scanPayload);
+          localStorage.setItem("offlineScans", JSON.stringify(scans));
+          
+          // Notify parent window
+          window.dispatchEvent(new Event("offline-scan-queued"));
+        }
 
         onMatch(matchedStudent, parseFloat(minDistance.toFixed(2)), checkInStatus);
       } else {
