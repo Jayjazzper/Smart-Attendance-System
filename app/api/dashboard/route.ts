@@ -187,6 +187,182 @@ export async function GET(req: NextRequest) {
         };
       });
 
+    // 7. Calculate AI Absenteeism Risk Alerts
+    const getUniqueSchoolDates = (logs: any[]) => {
+      const dates = new Set<string>();
+      logs.forEach(log => {
+        if (log.timestamp) {
+          const dateStr = log.timestamp.split('T')[0];
+          const d = new Date(log.timestamp);
+          const day = d.getDay();
+          if (day !== 0 && day !== 6) { // skip weekends
+            dates.add(dateStr);
+          }
+        }
+      });
+      return Array.from(dates).sort();
+    };
+
+    let schoolDates = getUniqueSchoolDates(attendance);
+    // Fallback if there are too few days in database
+    if (schoolDates.length < 2) {
+      const tempDates: string[] = [];
+      let i = 0;
+      while (tempDates.length < 10) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const day = d.getDay();
+        if (day !== 0 && day !== 6) {
+          tempDates.push(d.toISOString().split('T')[0]);
+        }
+        i++;
+      }
+      schoolDates = tempDates.reverse();
+    }
+
+    const riskAlerts = students.map(student => {
+      const studentLogs = attendance.filter(log => log.studentId === student.id);
+      
+      const statusByDate = new Map<string, string>();
+      studentLogs.forEach(log => {
+        if (log.timestamp) {
+          const dStr = log.timestamp.split('T')[0];
+          statusByDate.set(dStr, log.status || 'present');
+        }
+      });
+
+      let presentCount = 0;
+      let lateCount = 0;
+      let leaveCount = 0;
+      let absentCount = 0;
+
+      schoolDates.forEach(date => {
+        const status = statusByDate.get(date);
+        if (status === 'present') presentCount++;
+        else if (status === 'late') lateCount++;
+        else if (status === 'leave') leaveCount++;
+        else absentCount++; // no record means absent
+      });
+
+      const totalDays = schoolDates.length;
+      const attended = presentCount + lateCount;
+      const denominator = totalDays - leaveCount;
+      const rate = denominator > 0 ? (attended / denominator) * 100 : 100;
+
+      // Find max consecutive absent/leave
+      let maxConsecutive = 0;
+      let currentConsecutive = 0;
+      schoolDates.forEach(date => {
+        const status = statusByDate.get(date) || 'absent';
+        if (status === 'absent' || status === 'leave') {
+          currentConsecutive++;
+          if (currentConsecutive > maxConsecutive) {
+            maxConsecutive = currentConsecutive;
+          }
+        } else {
+          currentConsecutive = 0;
+        }
+      });
+
+      // Count Monday/Friday absence or leave
+      let monFriAbsenceCount = 0;
+      schoolDates.forEach(date => {
+        const status = statusByDate.get(date) || 'absent';
+        if (status === 'absent' || status === 'leave') {
+          const d = new Date(date);
+          const day = d.getDay();
+          if (day === 1 || day === 5) {
+            monFriAbsenceCount++;
+          }
+        }
+      });
+
+      const reasons: string[] = [];
+      let riskLevel: 'high' | 'medium' | 'low' = 'low';
+      let recommendation = 'รักษาระดับการเข้าเรียนที่ดีเยี่ยมไว้ ชื่นชมเพื่อเป็นกำลังใจในการเรียนต่อ';
+
+      if (rate < 80) {
+        riskLevel = 'high';
+        reasons.push(`อัตราเข้าเรียนต่ำกว่าเกณฑ์ (${rate.toFixed(0)}%)`);
+      }
+      if (maxConsecutive >= 3) {
+        riskLevel = 'high';
+        reasons.push(`หยุดเรียนติดต่อกัน ${maxConsecutive} วันทำการ`);
+      }
+      if (monFriAbsenceCount >= 3) {
+        if (riskLevel !== 'high') riskLevel = 'medium';
+        reasons.push(`หยุดเรียนวันจันทร์หรือวันศุกร์บ่อย (${monFriAbsenceCount} ครั้ง)`);
+      }
+      if (rate >= 80 && rate < 90) {
+        if (riskLevel !== 'high') riskLevel = 'medium';
+        reasons.push(`อัตราเข้าเรียนต่ำกว่าปกติ (${rate.toFixed(0)}%)`);
+      }
+
+      if (riskLevel === 'high') {
+        recommendation = 'ควรติดต่อพบผู้ปกครองทันทีและรายงานผู้บริหารเพื่อร่วมกันแก้ปัญหา';
+      } else if (riskLevel === 'medium') {
+        recommendation = 'ควรโทรศัพท์สอบถามผู้ปกครอง หรือร่วมพูดคุยหลังเลิกเรียนเพื่อหาสาเหตุ';
+      }
+
+      return {
+        studentId: student.id,
+        name: student.name,
+        classroom: student.classroom || '',
+        level: student.level || 'primary',
+        attendanceRate: Math.round(rate),
+        riskLevel,
+        reasons,
+        recommendation
+      };
+    })
+    .filter(alert => alert.riskLevel !== 'low')
+    .sort((a, b) => {
+      if (a.riskLevel === 'high' && b.riskLevel === 'medium') return -1;
+      if (a.riskLevel === 'medium' && b.riskLevel === 'high') return 1;
+      return a.attendanceRate - b.attendanceRate; // lower rate comes first
+    });
+
+    // Calculate health screening metrics for today's attendees
+    let healthNormalToday = 0;
+    let healthFeverToday = 0;
+    let healthCoughToday = 0;
+    const sickStudentsToday: { name: string; classroom: string; status: 'fever' | 'cough'; temp?: number }[] = [];
+
+    // Map unique student health states today to avoid duplicate counts on multiple scans
+    const studentHealthMap = new Map<string, { status: string; temp?: number; name: string; classroom: string }>();
+    todayLogs.forEach(log => {
+      if (log.status === "present" || log.status === "late") {
+        studentHealthMap.set(log.studentId, {
+          status: log.healthStatus || "normal",
+          temp: log.temperature,
+          name: log.studentName,
+          classroom: log.classroom || ""
+        });
+      }
+    });
+
+    studentHealthMap.forEach(info => {
+      if (info.status === "fever") {
+        healthFeverToday++;
+        sickStudentsToday.push({
+          name: info.name,
+          classroom: info.classroom,
+          status: "fever",
+          temp: info.temp
+        });
+      } else if (info.status === "cough") {
+        healthCoughToday++;
+        sickStudentsToday.push({
+          name: info.name,
+          classroom: info.classroom,
+          status: "cough",
+          temp: info.temp
+        });
+      } else {
+        healthNormalToday++;
+      }
+    });
+
     return NextResponse.json({
       totalStudents,
       presentToday,
@@ -196,6 +372,13 @@ export async function GET(req: NextRequest) {
       recentScans,
       leaderboard,
       peakCheckinTimes,
+      riskAlerts,
+      healthSummary: {
+        normal: healthNormalToday,
+        fever: healthFeverToday,
+        cough: healthCoughToday,
+        sickStudents: sickStudentsToday
+      }
     });
   } catch (error) {
     console.error("GET /api/dashboard error:", error);

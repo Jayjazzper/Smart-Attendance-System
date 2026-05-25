@@ -16,7 +16,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { studentId, confidence, status, classroom, timestamp } = body;
+    const { studentId, confidence, status, classroom, timestamp, temperature, healthStatus } = body;
 
     if (!studentId || confidence === undefined) {
       return NextResponse.json(
@@ -48,6 +48,8 @@ export async function POST(req: NextRequest) {
       classroom: recordClassroom,
       status: recordStatus as 'present' | 'late' | 'absent' | 'leave',
       timestamp: timestamp,
+      temperature: temperature !== undefined ? parseFloat(temperature) : undefined,
+      healthStatus: healthStatus || undefined,
     });
 
     if (!newRecord) {
@@ -111,7 +113,21 @@ async function triggerLineNotification(token: string, record: any) {
       timeZone: "Asia/Bangkok",
     });
 
-    const message = `\n📢 รายงานการเช็คชื่อเข้าเรียน\n👤 นักเรียน: ${record.studentName}\n🆔 รหัสประจำตัว: ${record.studentId}\n🏫 ห้องเรียน: ${record.classroom || "-"}\n📅 วันที่: ${dateStr}\n⏰ เวลา: ${timeStr} น.\n📌 สถานะ: ${statusText}`;
+    const healthStatusMap = {
+      normal: "ปกติ 🟢",
+      fever: "ตัวร้อน/มีไข้ 🔴",
+      cough: "ไอ/จาม 🟡",
+    };
+    const healthText = record.healthStatus ? (healthStatusMap[record.healthStatus as keyof typeof healthStatusMap] || record.healthStatus) : null;
+    const tempText = record.temperature !== undefined ? `${record.temperature} °C` : null;
+
+    let message = `\n📢 รายงานการเช็คชื่อเข้าเรียน\n👤 นักเรียน: ${record.studentName}\n🆔 รหัสประจำตัว: ${record.studentId}\n🏫 ห้องเรียน: ${record.classroom || "-"}\n📅 วันที่: ${dateStr}\n⏰ เวลา: ${timeStr} น.\n📌 สถานะ: ${statusText}`;
+
+    if (tempText || healthText) {
+      message += `\n🩺 ข้อมูลสุขภาพ:`;
+      if (tempText) message += `\n🌡️ อุณหภูมิ: ${tempText}`;
+      if (healthText) message += `\n🩺 อาการทั่วไป: ${healthText}`;
+    }
 
     await fetch("https://notify-api.line.me/api/notify", {
       method: "POST",
@@ -151,7 +167,21 @@ async function triggerLineOAPushNotification(accessToken: string, toUserId: stri
       timeZone: "Asia/Bangkok",
     });
 
-    const message = `📢 รายงานการเช็คชื่อเรียนของบุตรหลาน\n👤 บุตรหลาน: ${record.studentName}\n🆔 รหัสประจำตัว: ${record.studentId}\n🏫 ห้องเรียน: ${record.classroom || "-"}\n📅 วันที่: ${dateStr}\n⏰ เวลา: ${timeStr} น.\n📌 สถานะ: ${statusText}`;
+    const healthStatusMap = {
+      normal: "ปกติ 🟢",
+      fever: "ตัวร้อน/มีไข้ 🔴",
+      cough: "ไอ/จาม 🟡",
+    };
+    const healthText = record.healthStatus ? (healthStatusMap[record.healthStatus as keyof typeof healthStatusMap] || record.healthStatus) : null;
+    const tempText = record.temperature !== undefined ? `${record.temperature} °C` : null;
+
+    let message = `📢 รายงานการเช็คชื่อเรียนของบุตรหลาน\n👤 บุตรหลาน: ${record.studentName}\n🆔 รหัสประจำตัว: ${record.studentId}\n🏫 ห้องเรียน: ${record.classroom || "-"}\n📅 วันที่: ${dateStr}\n⏰ เวลา: ${timeStr} น.\n📌 สถานะ: ${statusText}`;
+
+    if (tempText || healthText) {
+      message += `\n🩺 ข้อมูลสุขภาพ:`;
+      if (tempText) message += `\n🌡️ อุณหภูมิ: ${tempText}`;
+      if (healthText) message += `\n🩺 อาการทั่วไป: ${healthText}`;
+    }
 
     const payload = {
       to: toUserId,

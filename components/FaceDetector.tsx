@@ -8,6 +8,7 @@ interface FaceDetectorProps {
   scanMode: "auto" | "manual";
   isScanning: boolean;
   setIsScanning: (scanning: boolean) => void;
+  isPaused?: boolean;
   onMatch: (student: Student | null, distance: number, status?: 'present' | 'late' | 'absent' | 'leave') => void;
   setMatchStatus: (status: "searching" | "found" | "failed") => void;
   homeroomTime?: string;
@@ -18,6 +19,7 @@ export default function FaceDetector({
   scanMode,
   isScanning,
   setIsScanning,
+  isPaused = false,
   onMatch,
   setMatchStatus,
   homeroomTime = "08:00",
@@ -25,6 +27,12 @@ export default function FaceDetector({
 }: FaceDetectorProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isPausedRef = useRef(isPaused);
+
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
+
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [streamActive, setStreamActive] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
@@ -130,7 +138,7 @@ export default function FaceDetector({
   // 3. Scan & Match Frame Core Logic
   const processFrame = async () => {
     const video = videoRef.current;
-    if (!video || !streamActive || isProcessingFrame.current) return;
+    if (!video || !streamActive || isProcessingFrame.current || isPausedRef.current) return;
     
     // Ensure video elements and metadata are fully loaded before passing to face-api
     if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
@@ -212,40 +220,6 @@ export default function FaceDetector({
           checkInStatus = "late";
         }
         
-        // Post attendance record to API or queue locally if offline
-        const confidenceScore = Math.round((1 - minDistance) * 100);
-        const scanPayload = {
-          studentId: matchedStudent.id,
-          confidence: confidenceScore,
-          status: checkInStatus,
-          classroom: matchedStudent.classroom || "",
-          timestamp: new Date().toISOString()
-        };
-
-        try {
-          if (!navigator.onLine) {
-            throw new Error("ระบบอยู่ในสถานะออฟไลน์");
-          }
-          const res = await fetch("/api/attendance", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(scanPayload),
-          });
-          if (!res.ok) {
-            throw new Error("HTTP connection failed");
-          }
-        } catch (err) {
-          console.warn("สแกนใบหน้าล้มเหลว (บันทึกออฟไลน์):", err);
-          // Save in localStorage queue
-          const existing = localStorage.getItem("offlineScans");
-          const scans = existing ? JSON.parse(existing) : [];
-          scans.push(scanPayload);
-          localStorage.setItem("offlineScans", JSON.stringify(scans));
-          
-          // Notify parent window
-          window.dispatchEvent(new Event("offline-scan-queued"));
-        }
-
         onMatch(matchedStudent, parseFloat(minDistance.toFixed(2)), checkInStatus);
       } else {
         // Fail or no match: Return best effort or unknown state with distance for debugging

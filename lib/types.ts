@@ -19,6 +19,8 @@ export interface Attendance {
   timestamp: string; // ISO format string
   classroom?: string;
   status?: 'present' | 'late' | 'absent' | 'leave';
+  temperature?: number; // Body temperature in Celsius
+  healthStatus?: 'normal' | 'fever' | 'cough'; // Health screening status
 }
 
 export interface DatabaseState {

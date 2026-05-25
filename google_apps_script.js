@@ -31,15 +31,21 @@ function doPost(e) {
     var attendanceSheet = ss.getSheetByName("attendance");
     if (!attendanceSheet) {
       attendanceSheet = ss.insertSheet("attendance");
-      attendanceSheet.appendRow(["id", "studentId", "studentName", "studentEmail", "timestamp", "confidence", "classroom", "status"]);
+      attendanceSheet.appendRow(["id", "studentId", "studentName", "studentEmail", "timestamp", "confidence", "classroom", "status", "temperature", "healthStatus"]);
     } else {
       // Ensure headers exist for new columns (upgrade existing sheets)
-      var headers = attendanceSheet.getRange(1, 1, 1, attendanceSheet.getLastColumn() || 8).getValues()[0];
+      var headers = attendanceSheet.getRange(1, 1, 1, attendanceSheet.getLastColumn() || 10).getValues()[0];
       if (headers.indexOf("classroom") === -1) {
         attendanceSheet.getRange(1, 7).setValue("classroom");
       }
       if (headers.indexOf("status") === -1) {
         attendanceSheet.getRange(1, 8).setValue("status");
+      }
+      if (headers.indexOf("temperature") === -1) {
+        attendanceSheet.getRange(1, 9).setValue("temperature");
+      }
+      if (headers.indexOf("healthStatus") === -1) {
+        attendanceSheet.getRange(1, 10).setValue("healthStatus");
       }
     }
     
@@ -167,7 +173,9 @@ function doPost(e) {
             timestamp: String(row[4]),
             confidence: Number(row[5]),
             classroom: row[6] ? String(row[6]) : "",
-            status: row[7] ? String(row[7]) : "present"
+            status: row[7] ? String(row[7]) : "present",
+            temperature: row[8] ? Number(row[8]) : undefined,
+            healthStatus: row[9] ? String(row[9]) : undefined
           });
         }
       }
@@ -183,7 +191,9 @@ function doPost(e) {
         record.timestamp,
         Number(record.confidence),
         record.classroom || "",
-        record.status || "present"
+        record.status || "present",
+        record.temperature !== undefined ? Number(record.temperature) : "",
+        record.healthStatus || ""
       ]);
       result = { success: true };
       

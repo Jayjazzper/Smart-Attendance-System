@@ -15,6 +15,16 @@ const FaceDetector = dynamic(() => import("@/components/FaceDetector"), {
   ),
 });
 
+// Load QrCodeScanner dynamically to avoid SSR node-environment crashes
+const QrCodeScanner = dynamic(() => import("@/components/QrCodeScanner"), {
+  ssr: false,
+  loading: () => (
+    <div className="relative aspect-video w-full overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 flex items-center justify-center shadow-inner animate-pulse">
+      <span className="text-xs font-semibold text-slate-400">กำลังดาวน์โหลดตัวสแกน QR Code...</span>
+    </div>
+  ),
+});
+
 interface CheckInLog {
   id: string;
   name: string;
@@ -26,6 +36,7 @@ interface CheckInLog {
 
 export default function CheckInPage() {
   const [scanMode, setScanMode] = useState<"auto" | "manual">("auto");
+  const [scannerType, setScannerType] = useState<"face" | "qrcode">("face");
   const [isScanning, setIsScanning] = useState(true);
   const [matchStatus, setMatchStatus] = useState<"searching" | "found" | "failed">("searching");
   const [currentMatch, setCurrentMatch] = useState<CheckInLog | null>(null);
@@ -37,6 +48,18 @@ export default function CheckInPage() {
   const [isOnline, setIsOnline] = useState(true);
   const [offlineQueueCount, setOfflineQueueCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Health Screening states
+  const [enableHealthScreening, setEnableHealthScreening] = useState(false);
+  const [showHealthModal, setShowHealthModal] = useState(false);
+  const [healthStudent, setHealthStudent] = useState<any | null>(null);
+  const [healthDistance, setHealthDistance] = useState(0);
+  const [healthCheckInStatus, setHealthCheckInStatus] = useState<'present' | 'late' | 'absent' | 'leave'>('present');
+  const [healthTemperature, setHealthTemperature] = useState(36.5);
+  const [healthStatus, setHealthStatus] = useState<'normal' | 'fever' | 'cough'>('normal');
+  const [countdown, setCountdown] = useState(3);
+  const [isCountdownActive, setIsCountdownActive] = useState(true);
+  const [isPaused, setIsPaused] = useState(false);
 
   // 1. Fetch recent scan history on load
   const fetchRecentLogs = async () => {
@@ -129,6 +152,12 @@ export default function CheckInPage() {
     setIsOnline(navigator.onLine);
     updateQueueCount();
 
+    // Load health screening toggle persistent preference
+    const savedScreening = localStorage.getItem("enableHealthScreening");
+    if (savedScreening === "true") {
+      setEnableHealthScreening(true);
+    }
+
     // Event listeners for online/offline status
     const handleOnline = () => {
       setIsOnline(true);
@@ -161,6 +190,108 @@ export default function CheckInPage() {
     };
   }, []);
 
+  const handleToggleHealthScreening = (val: boolean) => {
+    setEnableHealthScreening(val);
+    localStorage.setItem("enableHealthScreening", String(val));
+  };
+
+  // 1.5-second auto-clear timer helper for scan matches
+  const startAutoClearTimer = () => {
+    setTimeout(() => {
+      setCurrentMatch(null);
+    }, 1500);
+  };
+
+  // Helper to submit check-in to API or queue offline
+  const submitCheckIn = async (
+    student: any,
+    status: 'present' | 'late' | 'absent' | 'leave',
+    confidence: number,
+    temp?: number,
+    hStatus?: 'normal' | 'fever' | 'cough'
+  ) => {
+    const scanPayload = {
+      studentId: student.id,
+      confidence: confidence,
+      status: status,
+      classroom: student.classroom || "",
+      timestamp: new Date().toISOString(),
+      temperature: temp,
+      healthStatus: hStatus
+    };
+
+    try {
+      if (!navigator.onLine) {
+        throw new Error("ระบบอยู่ในสถานะออฟไลน์");
+      }
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(scanPayload),
+      });
+      if (!res.ok) {
+        throw new Error("HTTP connection failed");
+      }
+    } catch (err) {
+      console.warn("สแกนบันทึกล้มเหลว (บันทึกออฟไลน์):", err);
+      const existing = localStorage.getItem("offlineScans");
+      const scans = existing ? JSON.parse(existing) : [];
+      scans.push(scanPayload);
+      localStorage.setItem("offlineScans", JSON.stringify(scans));
+      window.dispatchEvent(new Event("offline-scan-queued"));
+    }
+  };
+
+  // Health modal submission handler
+  const handleHealthSubmit = async (
+    temp: number,
+    hStatus: 'normal' | 'fever' | 'cough'
+  ) => {
+    if (!healthStudent) return;
+    
+    const confidenceScore = Math.round((1 - healthDistance) * 100);
+    await submitCheckIn(healthStudent, healthCheckInStatus, confidenceScore, temp, hStatus);
+    
+    const formattedTime = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น.";
+    const matchedLog: CheckInLog = {
+      id: healthStudent.id,
+      name: healthStudent.name,
+      time: formattedTime,
+      distance: healthDistance,
+      classroom: healthStudent.classroom || "",
+      status: healthCheckInStatus,
+    };
+    
+    setCurrentMatch(matchedLog);
+    setMatchStatus("found");
+    
+    setShowHealthModal(false);
+    fetchRecentLogs();
+    
+    // Pause for 1.5 seconds to show verification details then resume detector
+    setTimeout(() => {
+      setCurrentMatch(null);
+      setHealthStudent(null);
+      setIsPaused(false);
+    }, 1500);
+  };
+
+  // Countdown timer for automatic health submission
+  useEffect(() => {
+    if (!showHealthModal || !isCountdownActive) return;
+
+    if (countdown <= 0) {
+      handleHealthSubmit(healthTemperature, healthStatus);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setCountdown(prev => prev - 1);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [showHealthModal, countdown, isCountdownActive, healthTemperature, healthStatus, healthStudent]);
+
   // 2. Callback when face matching finishes processing a frame
   const handleFaceMatch = async (
     matchedStudent: Student | null,
@@ -170,20 +301,38 @@ export default function CheckInPage() {
     const formattedTime = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น.";
     
     if (matchedStudent) {
-      // 1. Found Match
-      const matchedLog: CheckInLog = {
-        id: matchedStudent.id,
-        name: matchedStudent.name,
-        time: formattedTime,
-        distance,
-        classroom: matchedStudent.classroom || "",
-        status: status || "present",
-      };
-      setCurrentMatch(matchedLog);
-      setMatchStatus("found");
-      
-      // Update session listing
-      fetchRecentLogs();
+      const checkInStatus = status || "present";
+      const confidenceScore = Math.round((1 - distance) * 100);
+
+      if (enableHealthScreening) {
+        // Pause scanning and trigger health screening wizard
+        setIsPaused(true);
+        setHealthStudent(matchedStudent);
+        setHealthDistance(distance);
+        setHealthCheckInStatus(checkInStatus);
+        setHealthTemperature(36.5);
+        setHealthStatus("normal");
+        setCountdown(3);
+        setIsCountdownActive(true);
+        setShowHealthModal(true);
+      } else {
+        // Immediate check-in without health screening
+        await submitCheckIn(matchedStudent, checkInStatus, confidenceScore);
+        
+        const matchedLog: CheckInLog = {
+          id: matchedStudent.id,
+          name: matchedStudent.name,
+          time: formattedTime,
+          distance,
+          classroom: matchedStudent.classroom || "",
+          status: checkInStatus,
+        };
+        setCurrentMatch(matchedLog);
+        setMatchStatus("found");
+        
+        fetchRecentLogs();
+        startAutoClearTimer();
+      }
     } else {
       // 2. Failed Match (Unknown face / High distance)
       setCurrentMatch({
@@ -193,6 +342,7 @@ export default function CheckInPage() {
         distance,
       });
       setMatchStatus("failed");
+      startAutoClearTimer();
     }
   };
 
@@ -200,6 +350,7 @@ export default function CheckInPage() {
     setIsScanning(true);
     setMatchStatus("searching");
     setCurrentMatch(null);
+    setIsPaused(false);
   };
 
   return (
@@ -277,77 +428,150 @@ export default function CheckInPage() {
                 />
               </div>
             </div>
+            {/* Health Screening Toggle */}
+            <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-xs font-bold text-slate-900">🩺 เปิดระบบคัดกรองสุขภาพ (Health Screening)</span>
+                <p className="text-[10px] font-semibold text-slate-500">บันทึกอุณหภูมิและอาการทางร่างกายของนักเรียนเมื่อเช็คชื่อ</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={enableHealthScreening}
+                  onChange={(e) => handleToggleHealthScreening(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+              </label>
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-            {/* Mode Controls */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 rounded-xl p-1">
+          <div className="rounded-2xl border border-slate-100 bg-white dark:bg-slate-900 p-4 shadow-sm">
+            {/* Scanner Type Switcher */}
+            <div className="flex items-center justify-between mb-4 border-b border-slate-100 dark:border-slate-800 pb-3">
+              <span className="text-xs font-bold text-slate-800 dark:text-slate-200">📸 เลือกรูปแบบเครื่องสแกน:</span>
+              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-950 rounded-xl p-1">
                 <button
                   onClick={() => {
-                    setScanMode("auto");
+                    setScannerType("face");
                     setIsScanning(true);
                     setCurrentMatch(null);
                   }}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-                    scanMode === "auto"
-                      ? "bg-white text-blue-600 shadow-sm"
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    scannerType === "face"
+                      ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm"
                       : "text-slate-500 hover:text-slate-900"
                   }`}
                 >
-                  สแกนอัตโนมัติ (Continuous)
+                  สแกนใบหน้า (Face AI)
                 </button>
                 <button
                   onClick={() => {
-                    setScanMode("manual");
-                    setIsScanning(false);
-                    setMatchStatus("searching");
+                    setScannerType("qrcode");
+                    setIsScanning(true);
                     setCurrentMatch(null);
                   }}
-                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
-                    scanMode === "manual"
-                      ? "bg-white text-blue-600 shadow-sm"
+                  className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                    scannerType === "qrcode"
+                      ? "bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-sm"
                       : "text-slate-500 hover:text-slate-900"
                   }`}
                 >
-                  สแกนด้วยตนเอง (Manual)
+                  สแกน QR Code (ID Card)
                 </button>
               </div>
-
-              {/* Status Indicator */}
-              <div className="flex items-center gap-1.5">
-                <span className={`h-2.5 w-2.5 rounded-full ${isScanning && scanMode === "auto" ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`}></span>
-                <span className="text-xs font-bold text-slate-600">
-                  {scanMode === "auto" && isScanning ? "กำลังรันกล้องต่อเนื่อง" : "กล้องสแตนด์บาย"}
-                </span>
-              </div>
             </div>
+
+            {/* Mode Controls */}
+            {scannerType === "face" && (
+              <div className="flex items-center justify-between mb-4 animate-fade-in">
+                <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 rounded-xl p-1">
+                  <button
+                    onClick={() => {
+                      setScanMode("auto");
+                      setIsScanning(true);
+                      setCurrentMatch(null);
+                    }}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                      scanMode === "auto"
+                        ? "bg-white text-blue-600 shadow-sm"
+                        : "text-slate-500 hover:text-slate-900"
+                    }`}
+                  >
+                    สแกนอัตโนมัติ (Continuous)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setScanMode("manual");
+                      setIsScanning(false);
+                      setMatchStatus("searching");
+                      setCurrentMatch(null);
+                    }}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
+                      scanMode === "manual"
+                        ? "bg-white text-blue-600 shadow-sm"
+                        : "text-slate-500 hover:text-slate-900"
+                    }`}
+                  >
+                    สแกนด้วยตนเอง (Manual)
+                  </button>
+                </div>
+
+                {/* Status Indicator */}
+                <div className="flex items-center gap-1.5">
+                  <span className={`h-2.5 w-2.5 rounded-full ${isScanning && scanMode === "auto" ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`}></span>
+                  <span className="text-xs font-bold text-slate-600">
+                    {scanMode === "auto" && isScanning ? "กำลังรันกล้องต่อเนื่อง" : "กล้องสแตนด์บาย"}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Webcam Live Frame Container */}
             <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-950 flex items-center justify-center">
               {/* Scan Laser Line */}
               {isScanning && <div className="animate-scan"></div>}
 
-              {/* FaceDetector actual component */}
-              <FaceDetector
-                scanMode={scanMode}
-                isScanning={isScanning}
-                setIsScanning={setIsScanning}
-                onMatch={handleFaceMatch}
-                setMatchStatus={setMatchStatus}
-                homeroomTime={homeroomTime}
-                lateLimitTime={lateLimitTime}
-              />
+              {/* Conditional Scanner Component */}
+              {scannerType === "face" ? (
+                <FaceDetector
+                  scanMode={scanMode}
+                  isScanning={isScanning}
+                  setIsScanning={setIsScanning}
+                  isPaused={isPaused}
+                  onMatch={handleFaceMatch}
+                  setMatchStatus={setMatchStatus}
+                  homeroomTime={homeroomTime}
+                  lateLimitTime={lateLimitTime}
+                />
+              ) : (
+                <QrCodeScanner
+                  onMatch={handleFaceMatch}
+                  setMatchStatus={setMatchStatus}
+                  homeroomTime={homeroomTime}
+                  lateLimitTime={lateLimitTime}
+                  isPaused={isPaused}
+                />
+              )}
 
               {/* Scanning visual frames guides */}
               {isScanning && !currentMatch && (
                 <div className="absolute inset-0 border-[24px] border-black/35 pointer-events-none flex items-center justify-center z-10">
-                  <div className="w-56 h-56 rounded-full border-2 border-dashed border-blue-500/50 flex items-center justify-center relative">
-                    <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-blue-500"></div>
-                    <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-blue-500"></div>
-                    <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-blue-500"></div>
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-blue-500"></div>
-                  </div>
+                  {scannerType === "face" ? (
+                    <div className="w-56 h-56 rounded-full border-2 border-dashed border-blue-500/50 flex items-center justify-center relative">
+                      <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-blue-500"></div>
+                      <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-blue-500"></div>
+                      <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-blue-500"></div>
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-blue-500"></div>
+                    </div>
+                  ) : (
+                    <div className="w-56 h-56 rounded-2xl border-2 border-dashed border-blue-500/50 flex items-center justify-center relative">
+                      <div className="absolute -top-1 -left-1 w-4 h-4 border-t-2 border-l-2 border-blue-500"></div>
+                      <div className="absolute -top-1 -right-1 w-4 h-4 border-t-2 border-r-2 border-blue-500"></div>
+                      <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-2 border-l-2 border-blue-500"></div>
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-2 border-r-2 border-blue-500"></div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -489,6 +713,169 @@ export default function CheckInPage() {
           </div>
         </div>
       </div>
+
+      {/* Glassmorphism Health Screening Modal */}
+      {showHealthModal && healthStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-fade-in">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/20 bg-white/80 dark:bg-slate-900/80 p-6 shadow-2xl backdrop-blur-xl flex flex-col gap-5 text-slate-800 dark:text-slate-100">
+            {/* Header with Countdown progress bar */}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">🩺 คัดกรองสุขภาพนักเรียน</span>
+                {isCountdownActive ? (
+                  <span className="text-[10px] font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                    <span>บันทึกอัตโนมัติใน {countdown} วินาที</span>
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-2 py-0.5 rounded-full">
+                    ⏸️ ครูหยุดตรวจเช็คอยู่
+                  </span>
+                )}
+              </div>
+              <h3 className="text-lg font-black text-slate-900 dark:text-white mt-1">
+                {healthStudent.name}
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-semibold">
+                ชั้นเรียน: {healthStudent.classroom || "ไม่ระบุ"} | สถานะ: {healthCheckInStatus === "late" ? "สาย" : "ปกติ"}
+              </p>
+            </div>
+
+            {/* Countdown progress bar line */}
+            {isCountdownActive && (
+              <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                <div 
+                  className="bg-blue-600 dark:bg-blue-400 h-full transition-all duration-1000 ease-linear"
+                  style={{ width: `${(countdown / 3) * 100}%` }}
+                ></div>
+              </div>
+            )}
+
+            {/* Temperature Slider & Input */}
+            <div className="flex flex-col gap-2 p-4 rounded-xl bg-slate-50 dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800/50">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">🌡️ อุณหภูมิร่างกาย</span>
+                <span className={`text-base font-extrabold ${healthTemperature >= 37.5 ? "text-red-500" : "text-emerald-500"}`}>
+                  {healthTemperature.toFixed(1)} °C
+                </span>
+              </div>
+              <input
+                type="range"
+                min="35.0"
+                max="40.0"
+                step="0.1"
+                value={healthTemperature}
+                onChange={(e) => {
+                  setHealthTemperature(parseFloat(e.target.value));
+                  setIsCountdownActive(false); // Pause auto-submit on manual edit
+                }}
+                className="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-600 dark:accent-blue-400"
+              />
+              
+              {/* Quick Presets */}
+              <div className="grid grid-cols-4 gap-2 mt-2">
+                {[36.5, 37.2, 37.8, 38.5].map((temp) => (
+                  <button
+                    key={temp}
+                    onClick={() => {
+                      setHealthTemperature(temp);
+                      setIsCountdownActive(false); // Pause auto-submit on manual edit
+                      if (temp >= 37.5) {
+                        setHealthStatus("fever");
+                      } else {
+                        setHealthStatus("normal");
+                      }
+                    }}
+                    className={`py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                      Math.abs(healthTemperature - temp) < 0.05
+                        ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                        : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300"
+                    }`}
+                  >
+                    {temp} °C
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Symptoms evaluation buttons */}
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">🟢 ผลประเมินคัดกรองเบื้องต้น</span>
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  onClick={() => {
+                    setHealthStatus("normal");
+                    setIsCountdownActive(false);
+                  }}
+                  className={`flex flex-col items-center justify-center py-2.5 rounded-xl border-2 transition-all cursor-pointer ${
+                    healthStatus === "normal"
+                      ? "bg-emerald-50/50 border-emerald-500 text-emerald-700 dark:bg-emerald-950/20 dark:text-emerald-400"
+                      : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400"
+                  }`}
+                >
+                  <span className="text-lg">🟢</span>
+                  <span className="text-[10px] font-bold mt-1">ปกติ</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setHealthStatus("cough");
+                    setIsCountdownActive(false);
+                  }}
+                  className={`flex flex-col items-center justify-center py-2.5 rounded-xl border-2 transition-all cursor-pointer ${
+                    healthStatus === "cough"
+                      ? "bg-amber-50/50 border-amber-500 text-amber-700 dark:bg-amber-950/20 dark:text-amber-400"
+                      : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400"
+                  }`}
+                >
+                  <span className="text-lg">🟡</span>
+                  <span className="text-[10px] font-bold mt-1">มีอาการไอ</span>
+                </button>
+                <button
+                  onClick={() => {
+                    setHealthStatus("fever");
+                    setIsCountdownActive(false);
+                  }}
+                  className={`flex flex-col items-center justify-center py-2.5 rounded-xl border-2 transition-all cursor-pointer ${
+                    healthStatus === "fever"
+                      ? "bg-red-50/50 border-red-500 text-red-700 dark:bg-red-950/20 dark:text-red-400"
+                      : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400"
+                  }`}
+                >
+                  <span className="text-lg">🔴</span>
+                  <span className="text-[10px] font-bold mt-1">มีไข้ตัวร้อน</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-2.5 mt-2">
+              <button
+                onClick={() => {
+                  setShowHealthModal(false);
+                  setHealthStudent(null);
+                  setIsPaused(false);
+                }}
+                className="flex-1 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                ยกเลิก
+              </button>
+              {isCountdownActive && (
+                <button
+                  onClick={() => setIsCountdownActive(false)}
+                  className="py-2 px-3 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/20 text-amber-600 dark:text-amber-400 text-xs font-bold hover:bg-amber-100 transition-colors cursor-pointer"
+                >
+                  หยุดเวลา
+                </button>
+              )}
+              <button
+                onClick={() => handleHealthSubmit(healthTemperature, healthStatus)}
+                className="flex-1 py-2 rounded-xl bg-blue-600 text-white text-xs font-bold hover:bg-blue-700 transition-colors cursor-pointer shadow-md shadow-blue-500/20"
+              >
+                บันทึกคัดกรอง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

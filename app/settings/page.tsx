@@ -16,6 +16,8 @@ interface SystemSettings {
   schoolName?: string;
   schoolDistrict?: string;
   schoolLogo?: string;
+  enableAutoSummary?: boolean;
+  summaryTime?: string;
 }
 
 interface Student {
@@ -27,7 +29,17 @@ interface Student {
 
 export default function SettingsPage() {
   const [students, setStudents] = useState<Student[]>([]);
-  const [settings, setSettings] = useState<SystemSettings>({ classrooms: {}, lineChannelAccessToken: "", teacherPasscode: "1234", adminPasscode: "1234", schoolName: "", schoolDistrict: "", schoolLogo: "" });
+  const [settings, setSettings] = useState<SystemSettings>({ 
+    classrooms: {}, 
+    lineChannelAccessToken: "", 
+    teacherPasscode: "1234", 
+    adminPasscode: "1234", 
+    schoolName: "", 
+    schoolDistrict: "", 
+    schoolLogo: "",
+    enableAutoSummary: false,
+    summaryTime: "08:30"
+  });
   const [loading, setLoading] = useState(true);
   
   // Visibility maps for tokens (so they aren't visible by default)
@@ -48,6 +60,80 @@ export default function SettingsPage() {
   // School Profile states
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileStatusMessage, setProfileStatusMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  // Auto Daily Summary states
+  const [isSavingSummarySettings, setIsSavingSummarySettings] = useState(false);
+  const [summaryStatusMessage, setSummaryStatusMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+  
+  // Classroom for test summary
+  const [testSummaryClassroom, setTestSummaryClassroom] = useState("");
+  const [isTestingSummary, setIsTestingSummary] = useState(false);
+  const [testSummaryStatusMessage, setTestSummaryStatusMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
+
+  const handleSaveSummarySettings = async () => {
+    setIsSavingSummarySettings(true);
+    setSummaryStatusMessage(null);
+
+    try {
+      const updatedSettings = {
+        ...settings,
+        enableAutoSummary: settings.enableAutoSummary ?? false,
+        summaryTime: settings.summaryTime || "08:30"
+      };
+
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedSettings)
+      });
+
+      if (res.ok) {
+        setSettings(updatedSettings);
+        setSummaryStatusMessage({ text: "✓ บันทึกตั้งค่ารายงานอัตโนมัติสำเร็จ", type: "success" });
+        setTimeout(() => setSummaryStatusMessage(null), 3000);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setSummaryStatusMessage({ text: errData.error || "เกิดข้อผิดพลาดในการบันทึก", type: "error" });
+      }
+    } catch (err) {
+      console.error(err);
+      setSummaryStatusMessage({ text: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", type: "error" });
+    } finally {
+      setIsSavingSummarySettings(false);
+    }
+  };
+
+  const handleTestSummaryReport = async () => {
+    if (!testSummaryClassroom) {
+      setTestSummaryStatusMessage({ text: "กรุณาเลือกห้องเรียนที่จะทดสอบ", type: "error" });
+      return;
+    }
+    setIsTestingSummary(true);
+    setTestSummaryStatusMessage(null);
+
+    try {
+      const res = await fetch("/api/attendance/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          classroom: testSummaryClassroom,
+          sendToLine: true
+        })
+      });
+
+      if (res.ok) {
+        setTestSummaryStatusMessage({ text: `✓ ส่งรายงานทดสอบห้อง ${testSummaryClassroom} สำเร็จแล้ว!`, type: "success" });
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        setTestSummaryStatusMessage({ text: errData.error || "ส่งรายงานสรุปไม่สำเร็จ", type: "error" });
+      }
+    } catch (err) {
+      console.error(err);
+      setTestSummaryStatusMessage({ text: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้", type: "error" });
+    } finally {
+      setIsTestingSummary(false);
+    }
+  };
 
   // Backup & Restore states
   const [backupFile, setBackupFile] = useState<File | null>(null);
@@ -759,6 +845,110 @@ export default function SettingsPage() {
                   <li>ออกรหัส **Channel Access Token** ในแท็บ Messaging API settings แล้วนำมาวางด้านบน</li>
                   <li>**LINE User ID** ของคุณหาได้จากหน้าจอหลักแท็บ Basic settings ด้านล่างสุด ของคอนโซล LINE Developers หรือดึงผ่าน webhook บอท</li>
                 </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Daily Summary Scheduler card */}
+          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm flex flex-col gap-6">
+            <div>
+              <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                ตั้งค่าส่งรายงานประจำวันอัตโนมัติ (Auto Daily Summary Scheduler)
+              </h3>
+              <p className="text-[10px] font-semibold text-slate-500 mt-0.5">
+                ส่งข้อความสรุปภาพรวมรายห้องเรียน (มาเรียน, สาย, ลา, ขาด) เข้ากลุ่มไลน์ประจำชั้นของครูและผู้ปกครองโดยอัตโนมัติทุกวัน
+              </p>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="flex flex-col gap-4">
+                {/* Enable Auto Summary Toggle */}
+                <div className="flex items-center justify-between p-3.5 bg-slate-50/50 rounded-xl border border-slate-100">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-bold text-slate-800">เปิดระบบส่งรายงานสรุปอัตโนมัติ</span>
+                    <span className="text-[10px] text-slate-400 font-semibold">ส่งเข้ากลุ่ม LINE Notify ของห้องเรียนนั้นๆ</span>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={settings.enableAutoSummary || false}
+                      onChange={(e) => setSettings(prev => ({ ...prev, enableAutoSummary: e.target.checked }))}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-350 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+
+                {/* Summary Time Picker */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-700">เวลาจัดส่งข้อความสรุปสถิติประจำวัน</label>
+                  <input
+                    type="time"
+                    value={settings.summaryTime || "08:30"}
+                    onChange={(e) => setSettings(prev => ({ ...prev, summaryTime: e.target.value }))}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 focus:border-blue-500 focus:outline-none transition-colors"
+                  />
+                  <span className="text-[9px] text-slate-400 font-bold">เวลามาตรฐานประเทศไทย (Asia/Bangkok)</span>
+                </div>
+
+                {/* Save Button */}
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={handleSaveSummarySettings}
+                    disabled={isSavingSummarySettings}
+                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm shadow-blue-500/20 hover:bg-blue-700 disabled:bg-slate-300 transition-colors cursor-pointer h-10"
+                  >
+                    {isSavingSummarySettings ? "กำลังบันทึก..." : "บันทึกตั้งค่าการส่งสรุปสถิติ"}
+                  </button>
+
+                  {summaryStatusMessage && (
+                    <div className={`rounded-xl px-4 py-2 text-center text-xs font-bold border animate-fade-in ${
+                      summaryStatusMessage.type === "success"
+                        ? "bg-emerald-50 border-emerald-100 text-emerald-800"
+                        : "bg-red-50 border-red-100 text-red-800"
+                    }`}>
+                      {summaryStatusMessage.text}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Test Daily Summary Area */}
+              <div className="rounded-xl border border-slate-100 p-4 bg-slate-50/50 flex flex-col gap-4">
+                <h4 className="text-xs font-bold text-slate-800">ทดสอบยิงสรุปยอดเข้าห้องเรียนทันที</h4>
+                
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-700">เลือกห้องเรียนสำหรับส่งสรุปทดสอบ</label>
+                  <select
+                    value={testSummaryClassroom}
+                    onChange={(e) => setTestSummaryClassroom(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 focus:border-blue-500 focus:outline-none transition-colors cursor-pointer"
+                  >
+                    <option value="">-- กรุณาเลือกห้องเรียน --</option>
+                    {classroomsList.map(cls => (
+                      <option key={cls} value={cls}>{cls}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  onClick={handleTestSummaryReport}
+                  disabled={isTestingSummary || !testSummaryClassroom}
+                  className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-white border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-50 disabled:text-slate-300 transition-colors cursor-pointer h-9.5"
+                >
+                  {isTestingSummary ? "กำลังส่งทดสอบ..." : "ส่งสถิติห้องนี้เข้าไลน์เดี๋ยวนี้ (Test)"}
+                </button>
+
+                {testSummaryStatusMessage && (
+                  <div className={`rounded-xl px-4 py-2 text-center text-xs font-bold border animate-fade-in ${
+                    testSummaryStatusMessage.type === "success"
+                      ? "bg-emerald-50 border-emerald-100 text-emerald-800"
+                      : "bg-red-50 border-red-100 text-red-800"
+                  }`}>
+                    {testSummaryStatusMessage.text}
+                  </div>
+                )}
               </div>
             </div>
           </div>

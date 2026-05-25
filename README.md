@@ -1,36 +1,75 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🏫 ระบบเช็คชื่อและคัดกรองสุขภาพนักเรียนอัจฉริยะ (Smart Attendance System)
 
-## Getting Started
+ระบบลงเวลาเรียนของนักเรียนผ่านกล้องเว็บแคมด้วย **ปัญญาประดิษฐ์ Face Recognition (สแกนใบหน้า) และระบบสแกน QR Code สำรอง** พร้อมด้วยระบบ **คัดกรองสุขภาพเบื้องต้น (วัดไข้/ไอ/ปกติ)** แจ้งเตือนผู้ปกครองแบบเรียลไทม์ผ่าน LINE Notify / LINE OA และระบบส่งรายงานสรุปสถิตินักเรียนของแต่ละห้องเรียนเข้ากลุ่มไลน์คุณครูและผู้ปกครองโดยอัตโนมัติประจำวัน
 
-First, run the development server:
+แอปพลิเคชันนี้ออกแบบมาให้ทำงานได้ **ฟรี 100%** ไม่มีค่าธรรมเนียมรายเดือน หรือค่าใช้จ่ายด้านเซิร์ฟเวอร์ และที่สำคัญคือ **คุณครูท่านอื่นสามารถคัดลอก (Make a Copy) นำไปตั้งค่าและใช้งานในโรงเรียนหรือห้องเรียนของตนเองได้ง่ายในเวลาไม่เกิน 5 นาที!**
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+---
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 ฟีเจอร์หลักของระบบ (Core Features)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **📸 ระบบเช็คชื่อแบบ Hybrid (Face AI / QR Code):** เช็คชื่อเข้าเรียนด้วยกล้องเว็บแคมผ่านระบบ AI จดจำใบหน้า หรือสลับใช้สแกน QR Code บัตรนักเรียน
+2. **🩺 ระบบคัดกรองสุขภาพสั้นขณะลงเวลา (Health Screening Integration):** ครูสามารถบันทึกอุณหภูมิร่างกายและสถานะคัดกรอง (ปกติ 🟢, มีอาการไอ 🟡, ตัวร้อน/มีไข้สูง 🔴) พร้อมตัวนับถอยหลัง 3 วินาทีสำหรับบันทึกอัตโนมัติเพื่อไม่ให้เกิดการต่อคิวยาวหน้าโรงเรียน ข้อมูลจะแนบไปใน LINE แจ้งเตือนทันที
+3. **📊 ระบบสรุปยอดประจำวันอัตโนมัติเข้ากลุ่ม LINE (Daily Attendance Summary Bot):** ยิงข้อความรายงานยอดสถิติเข้าเรียนของวันนั้น ๆ เข้ากลุ่ม LINE ครูและผู้ปกครองโดยอัตโนมัติ ณ เวลาที่กำหนด (เช่น 08:30 น.)
+4. **💳 ระบบออกบัตรนักเรียนดิจิทัล (Digital Student ID Badge):** ออกบัตรนักเรียนแบบกระจกฝ้า (Glassmorphism) มี QR Code ประจำตัวแสดงผลอยู่บนหน้าบัตร พร้อมปุ่มกดสั่งพิมพ์แยกเฉพาะตัวบัตรได้อย่างสวยงาม
+5. **🚨 ระบบวิเคราะห์พฤติกรรมขาดเรียนเชิงลึก (AI Early Warning):** แจ้งเตือนเด็กกลุ่มเสี่ยงขาดเรียนบ่อย เสี่ยงหลุดออกจากระบบการศึกษา พร้อมคำแนะนำสำหรับครูประจำชั้น
+6. **🔒 ระบบสิทธิ์แยกห้องเรียน (Classroom Access Control):** ล็อกสิทธิ์ครูประจำชั้นไม่ให้เห็นหรือแก้ไขห้องเรียนอื่น รวมถึงการล็อกหน้าความปลอดภัยสูงสุดสำหรับผู้ดูแลระบบ (Admin Guard)
+7. **🔄 ระบบทำงานแบบออฟไลน์ (Offline Database & Auto-Sync):** หากเน็ตโรงเรียนหลุด ระบบจะยังสามารถสแกนจำหน้าเด็กในเครื่อง และจะบันทึกคิวไว้ในเบราว์เซอร์เพื่อซิงค์ส่งแจ้งเตือนย้อนหลังเข้า LINE ทันทีเมื่อต่อเน็ตติด
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+---
 
-## Learn More
+## 🛠️ ขั้นตอนการคัดลอกและเปิดใช้งานระบบ (Replication Guide for Teachers)
 
-To learn more about Next.js, take a look at the following resources:
+คุณครูท่านใดที่สนใจนำระบบเช็คชื่อนี้ไปใช้เป็นส่วนตัวในห้องเรียนหรือโรงเรียนของตนเอง สามารถจัดเตรียมและติดตั้งได้ใน 2 ขั้นตอนง่าย ๆ ดังนี้ครับ:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### ขั้นตอนที่ 1: เตรียมระบบฐานข้อมูล Google Sheets (ฟรี)
+ระบบนี้ทำงานโดยการดึงและบันทึกข้อมูลแบบเรียลไทม์ผ่าน Google Sheets เพื่อความสะดวกในการเปิดดูข้อมูลของคุณครู:
+1. **คัดลอกไฟล์แผ่นงานต้นแบบ:** ทำสำเนา (Make a Copy) ของไฟล์ Google Sheets ต้นแบบของโรงเรียนคุณ
+2. **คัดลอกและตั้งค่าสคริปต์:**
+   - ในชีตที่ทำสำเนาขึ้นมา ให้คลิกไปที่เมนู **ส่วนขยาย (Extensions) > Apps Script**
+   - นำโค้ดจากไฟล์ [`google_apps_script.js`](./google_apps_script.js) ในโครงการนี้ไปวางแทนที่โค้ดเดิมทั้งหมดในโปรแกรมแก้ไขสคริปต์
+3. **เปิดใช้งานสคริปต์ให้เป็นเว็บแอป (Deploy Web App):**
+   - คลิกที่ปุ่ม **การทำให้ใช้งานได้ (Deploy) > การทำให้ใช้งานได้ใหม่ (New Deployment)**
+   - เลือกประเภทเป็น **เว็บแอป (Web App)**
+   - ตั้งค่าตัวเลือกดังนี้:
+     * *เรียกใช้งานในฐานะ (Execute as):* **ฉัน (บัญชี Google ของครูเอง)**
+     * *ผู้มีสิทธิ์เข้าถึง (Who has access):* **ทุกคน (Anyone)** (เพื่ออนุญาตให้แอปเช็คชื่อสแกนใบหน้าบนอินเทอร์เน็ตส่งข้อมูลเข้ามาได้)
+   - คลิกปุ่ม **Deploy** และให้สิทธิ์เข้าถึง (Authorize) แก่สคริปต์จนเสร็จสิ้น
+   - คัดลอกค่า **URL ของเว็บแอป (Web App URL)** ที่ระบุมา (ลิงก์จะลงท้ายด้วย `/exec`) เก็บเอาไว้ใช้ในขั้นตอนที่ 2
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+### ขั้นตอนที่ 2: นำระบบเช็คชื่อขึ้นออนไลน์ผ่าน Vercel (1-Click Deploy)
+คลิกปุ่มด้านล่างนี้เพื่อคัดลอกโค้ดระบบเช็คชื่อและติดตั้งออนไลน์ผ่านบัญชี Vercel ของคุณฟรีทันที:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FJayjazzper%2FSmart-Attendance-System&env=NEXT_PUBLIC_GOOGLE_SCRIPT_URL,NEXT_PUBLIC_SCHOOL_NAME,NEXT_PUBLIC_SCHOOL_DISTRICT)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**สิ่งที่ต้องทำในหน้าต่าง Vercel Deploy:**
+1. **สร้างบัญชี Vercel (ถ้ายังไม่มี):** สมัครใช้งานฟรีโดยเชื่อมต่อกับบัญชี GitHub ของคุณ
+2. **สร้าง Repository ส่วนตัว:** ป้อนชื่อโปรเจกต์ Vercel จะสร้างสำเนาซอร์สโค้ดนี้ส่งเข้าไปยังบัญชี GitHub ของคุณโดยอัตโนมัติ
+3. **ป้อนค่าตัวแปรสภาพแวดล้อม (Environment Variables):**
+   * `NEXT_PUBLIC_GOOGLE_SCRIPT_URL`: วางลิงก์ **URL ของเว็บแอป** ที่คัดลอกมาจากขั้นตอน Google Sheets ด้านบน
+   * `NEXT_PUBLIC_SCHOOL_NAME`: ป้อนชื่อโรงเรียนของคุณ (เพื่อแสดงผลบนหัวเว็บ)
+   * `NEXT_PUBLIC_SCHOOL_DISTRICT`: ป้อนสังกัด/สำนักงานการศึกษาของโรงเรียนคุณ
+4. คลิกปุ่ม **Deploy**
+5. นั่งรอระบบประมวลผลประมาณ 1 นาที ระบบจะแจ้งเตือนสำเร็จและให้ลิงก์ออนไลน์อย่างเป็นทางการสำหรับเข้าใช้งานผ่านมือถือ แท็บเล็ต หรือเครื่องคอมพิวเตอร์ของคุณครูได้ทันทีตลอด 24 ชั่วโมง!
+
+---
+
+## 🔧 การพัฒนาและรันบนเครื่องคอมพิวเตอร์ท้องถิ่น (Local Development)
+
+หากต้องการรันเพื่อแก้ไขดีไซน์หรือพัฒนาโค้ดเพิ่มเติมในเครื่องคอมพิวเตอร์ของตัวเอง:
+
+1. ติดตั้งไลบรารีทั้งหมดในไดเรกทอรีโครงการ:
+   ```bash
+   npm install
+   ```
+2. ป้อนค่าตัวแปรสภาพแวดล้อมในไฟล์ `.env.local`:
+   ```env
+   NEXT_PUBLIC_GOOGLE_SCRIPT_URL=ลิงก์เว็บแอป_ของสคริปต์
+   ```
+3. สั่งรันเวอร์ชันทดสอบบนเครื่อง:
+   ```bash
+   npm run dev
+   ```
+4. เปิดเบราว์เซอร์เข้าที่: [http://localhost:3000](http://localhost:3000)

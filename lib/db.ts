@@ -380,14 +380,346 @@ export async function resetDatabase(): Promise<boolean> {
   try {
     await fs.writeFile(STUDENTS_FILE, JSON.stringify({ students: [] }, null, 2));
     await fs.writeFile(ATTENDANCE_FILE, JSON.stringify({ attendance: [] }, null, 2));
-    return true;
+    await fs.writeFile(LEAVES_FILE, JSON.stringify({ leaves: [] }, null, 2));
   } catch (error) {
     console.error('Error resetting local database:', error);
     return false;
   } finally {
     release();
   }
+
+  // Seed mock data
+  await seedMockData();
+  return true;
 }
+
+// Seed Mock Data for 7 students and 10 weekdays of attendance history
+export async function seedMockData(): Promise<boolean> {
+  const release = await dbMutex.acquire();
+  try {
+    await ensureDbExists();
+
+    const mockStudents: Student[] = [
+      {
+        id: "10001",
+        name: "เด็กชายสมชาย รักดี",
+        email: "somchai.rak@school.mail",
+        faceDescriptor: Array(128).fill(0),
+        consentGiven: true,
+        registeredAt: new Date().toISOString(),
+        classroom: "ป.4/1",
+        level: "primary"
+      },
+      {
+        id: "10002",
+        name: "เด็กหญิงมานี ดีใจ",
+        email: "manee.dee@school.mail",
+        faceDescriptor: Array(128).fill(0),
+        consentGiven: true,
+        registeredAt: new Date().toISOString(),
+        classroom: "ป.4/1",
+        level: "primary"
+      },
+      {
+        id: "10003",
+        name: "เด็กชายปิติ รุ่งเรือง",
+        email: "piti.rung@school.mail",
+        faceDescriptor: Array(128).fill(0),
+        consentGiven: true,
+        registeredAt: new Date().toISOString(),
+        classroom: "ป.4/1",
+        level: "primary"
+      },
+      {
+        id: "10004",
+        name: "เด็กหญิงชูใจ ตั้งใจ",
+        email: "choojai.tang@school.mail",
+        faceDescriptor: Array(128).fill(0),
+        consentGiven: true,
+        registeredAt: new Date().toISOString(),
+        classroom: "ป.4/2",
+        level: "primary"
+      },
+      {
+        id: "10005",
+        name: "เด็กชายวีระ แกล้วกล้า",
+        email: "weera.klaw@school.mail",
+        faceDescriptor: Array(128).fill(0),
+        consentGiven: true,
+        registeredAt: new Date().toISOString(),
+        classroom: "ป.4/2",
+        level: "primary"
+      },
+      {
+        id: "10006",
+        name: "นายดนัย ใฝ่รู้",
+        email: "danai.fai@school.mail",
+        faceDescriptor: Array(128).fill(0),
+        consentGiven: true,
+        registeredAt: new Date().toISOString(),
+        classroom: "ม.1/1",
+        level: "secondary"
+      },
+      {
+        id: "10007",
+        name: "นางสาวกานดา รักเรียน",
+        email: "kanda.rak@school.mail",
+        faceDescriptor: Array(128).fill(0),
+        consentGiven: true,
+        registeredAt: new Date().toISOString(),
+        classroom: "ม.1/1",
+        level: "secondary"
+      }
+    ];
+
+    // Preserve existing real students (like Jirayu Go)
+    let finalStudents = [...mockStudents];
+    try {
+      const studentData = await fs.readFile(STUDENTS_FILE, 'utf-8');
+      const parsed = JSON.parse(studentData);
+      const existing: Student[] = parsed.students || [];
+      const realStudents = existing.filter((s: Student) => !s.id.startsWith("1000"));
+      finalStudents = [...realStudents, ...mockStudents];
+    } catch (e) {}
+
+    await fs.writeFile(STUDENTS_FILE, JSON.stringify({ students: finalStudents }, null, 2));
+
+    // Generate 10 weekdays of attendance history
+    const attendanceRecords: Attendance[] = [];
+    const getPastWeekdays = (count: number): Date[] => {
+      const dates: Date[] = [];
+      let i = 0;
+      while (dates.length < count) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const day = d.getDay();
+        if (day !== 0 && day !== 6) { // Skip Sat/Sun
+          dates.push(d);
+        }
+        i++;
+      }
+      return dates.reverse(); // oldest first
+    };
+
+    const pastWeekdays = getPastWeekdays(10);
+    const makeId = () => Math.random().toString(36).substring(2, 11);
+
+    pastWeekdays.forEach((dayDate, dayIndex) => {
+      const dayOfWeek = dayDate.getDay();
+
+      // Student 1 (10001): Present/Late
+      let s1Status: 'present' | 'late' = dayIndex === 4 ? 'late' : 'present';
+      let s1Hour = s1Status === 'present' ? 7 : 8;
+      let s1Min = s1Status === 'present' ? 35 + (dayIndex % 15) : 5 + (dayIndex % 5);
+      attendanceRecords.push({
+        id: makeId(),
+        studentId: "10001",
+        studentName: "เด็กชายสมชาย รักดี",
+        studentEmail: "somchai.rak@school.mail",
+        confidence: 100,
+        timestamp: new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), s1Hour, s1Min, 0).toISOString(),
+        classroom: "ป.4/1",
+        status: s1Status
+      });
+
+      // Student 2 (10002): Absent on Day 5, 6, 7, 9
+      if (dayIndex !== 4 && dayIndex !== 5 && dayIndex !== 6 && dayIndex !== 8) {
+        let s2Status: 'present' | 'late' = dayIndex === 2 ? 'late' : 'present';
+        let s2Hour = s2Status === 'present' ? 7 : 8;
+        let s2Min = s2Status === 'present' ? 40 + (dayIndex % 15) : 10 + (dayIndex % 5);
+        attendanceRecords.push({
+          id: makeId(),
+          studentId: "10002",
+          studentName: "เด็กหญิงมานี ดีใจ",
+          studentEmail: "manee.dee@school.mail",
+          confidence: 100,
+          timestamp: new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), s2Hour, s2Min, 0).toISOString(),
+          classroom: "ป.4/1",
+          status: s2Status
+        });
+      } else {
+        // Record as absent
+        attendanceRecords.push({
+          id: makeId(),
+          studentId: "10002",
+          studentName: "เด็กหญิงมานี ดีใจ",
+          studentEmail: "manee.dee@school.mail",
+          confidence: 100,
+          timestamp: new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 8, 30, 0).toISOString(),
+          classroom: "ป.4/1",
+          status: 'absent'
+        });
+      }
+
+      // Student 3 (10003): Absent on Mon/Fri (dayDate.getDay() === 1 or 5)
+      if (dayOfWeek !== 1 && dayOfWeek !== 5) {
+        let s3Min = 42 + (dayIndex % 12);
+        attendanceRecords.push({
+          id: makeId(),
+          studentId: "10003",
+          studentName: "เด็กชายปิติ รุ่งเรือง",
+          studentEmail: "piti.rung@school.mail",
+          confidence: 100,
+          timestamp: new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 7, s3Min, 0).toISOString(),
+          classroom: "ป.4/1",
+          status: 'present'
+        });
+      } else {
+        attendanceRecords.push({
+          id: makeId(),
+          studentId: "10003",
+          studentName: "เด็กชายปิติ รุ่งเรือง",
+          studentEmail: "piti.rung@school.mail",
+          confidence: 100,
+          timestamp: new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 8, 30, 0).toISOString(),
+          classroom: "ป.4/1",
+          status: 'absent'
+        });
+      }
+
+      // Student 4 (10004): Leave on days 6, 7, 8
+      if (dayIndex !== 5 && dayIndex !== 6 && dayIndex !== 7) {
+        let s4Min = 45 + (dayIndex % 10);
+        attendanceRecords.push({
+          id: makeId(),
+          studentId: "10004",
+          studentName: "เด็กหญิงชูใจ ตั้งใจ",
+          studentEmail: "choojai.tang@school.mail",
+          confidence: 100,
+          timestamp: new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 7, s4Min, 0).toISOString(),
+          classroom: "ป.4/2",
+          status: 'present'
+        });
+      } else {
+        attendanceRecords.push({
+          id: makeId(),
+          studentId: "10004",
+          studentName: "เด็กหญิงชูใจ ตั้งใจ",
+          studentEmail: "choojai.tang@school.mail",
+          confidence: 100,
+          timestamp: new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 8, 30, 0).toISOString(),
+          classroom: "ป.4/2",
+          status: 'leave'
+        });
+      }
+
+      // Student 5 (10005): Late/Present/Absent (80% attendance rate)
+      if (dayIndex !== 8) {
+        let s5Status: 'present' | 'late' = (dayIndex % 2 === 0) ? 'late' : 'present';
+        let s5Hour = s5Status === 'present' ? 7 : 8;
+        let s5Min = s5Status === 'present' ? 45 + (dayIndex % 10) : 8 + (dayIndex % 6);
+        attendanceRecords.push({
+          id: makeId(),
+          studentId: "10005",
+          studentName: "เด็กชายวีระ แกล้วกล้า",
+          studentEmail: "weera.klaw@school.mail",
+          confidence: 100,
+          timestamp: new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), s5Hour, s5Min, 0).toISOString(),
+          classroom: "ป.4/2",
+          status: s5Status
+        });
+      } else {
+        attendanceRecords.push({
+          id: makeId(),
+          studentId: "10005",
+          studentName: "เด็กชายวีระ แกล้วกล้า",
+          studentEmail: "weera.klaw@school.mail",
+          confidence: 100,
+          timestamp: new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 8, 30, 0).toISOString(),
+          classroom: "ป.4/2",
+          status: 'absent'
+        });
+      }
+
+      // Student 6 (10006): Present early
+      let s6Min = 15 + (dayIndex % 12);
+      attendanceRecords.push({
+        id: makeId(),
+        studentId: "10006",
+        studentName: "นายดนัย ใฝ่รู้",
+        studentEmail: "danai.fai@school.mail",
+        confidence: 100,
+        timestamp: new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 7, s6Min, 0).toISOString(),
+        classroom: "ม.1/1",
+        status: 'present'
+      });
+
+      // Student 7 (10007): Absent on Day 1, 4, 7 (70% attendance rate)
+      if (dayIndex !== 0 && dayIndex !== 3 && dayIndex !== 6) {
+        let s7Min = 35 + (dayIndex % 18);
+        attendanceRecords.push({
+          id: makeId(),
+          studentId: "10007",
+          studentName: "นางสาวกานดา รักเรียน",
+          studentEmail: "kanda.rak@school.mail",
+          confidence: 100,
+          timestamp: new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 7, s7Min, 0).toISOString(),
+          classroom: "ม.1/1",
+          status: 'present'
+        });
+      } else {
+        attendanceRecords.push({
+          id: makeId(),
+          studentId: "10007",
+          studentName: "นางสาวกานดา รักเรียน",
+          studentEmail: "kanda.rak@school.mail",
+          confidence: 100,
+          timestamp: new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate(), 8, 30, 0).toISOString(),
+          classroom: "ม.1/1",
+          status: 'absent'
+        });
+      }
+    });
+
+    // Assign health screening records to mock history
+    const finalAttendance = attendanceRecords.map(record => {
+      if (record.status === 'present' || record.status === 'late') {
+        const isCough = record.studentId === "10005" && new Date(record.timestamp).getDay() === 3; // make one of the entries have a cough
+        const baseTemp = 36.1 + (parseFloat(record.studentId) % 5) * 0.1;
+        const offset = (new Date(record.timestamp).getDate() % 4) * 0.1;
+        return {
+          ...record,
+          temperature: parseFloat((baseTemp + offset).toFixed(1)),
+          healthStatus: (isCough ? 'cough' : 'normal') as 'normal' | 'cough' | 'fever'
+        };
+      } else if (record.status === 'leave') {
+        return {
+          ...record,
+          temperature: 38.2,
+          healthStatus: 'fever' as 'normal' | 'cough' | 'fever'
+        };
+      }
+      return record;
+    });
+
+    await fs.writeFile(ATTENDANCE_FILE, JSON.stringify({ attendance: finalAttendance }, null, 2));
+
+    // Also populate leaves.json
+    const mockLeaves = [
+      {
+        id: makeId(),
+        studentId: "10004",
+        studentName: "เด็กหญิงชูใจ ตั้งใจ",
+        classroom: "ป.4/2",
+        startDate: pastWeekdays[5].toISOString().split('T')[0],
+        endDate: pastWeekdays[7].toISOString().split('T')[0],
+        type: "sick",
+        reason: "มีไข้สูง ปวดศีรษะ",
+        status: "approved",
+        submittedAt: pastWeekdays[5].toISOString()
+      }
+    ];
+    await fs.writeFile(LEAVES_FILE, JSON.stringify({ leaves: mockLeaves }, null, 2));
+
+    return true;
+  } catch (error) {
+    console.error("Error seeding mock data:", error);
+    return false;
+  } finally {
+    release();
+  }
+}
+
 
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 
@@ -403,6 +735,9 @@ export interface SystemSettings {
   schoolName?: string;
   schoolDistrict?: string;
   schoolLogo?: string;
+  enableAutoSummary?: boolean; // Enable automatic daily LINE summary
+  summaryTime?: string; // Time to send daily summary, e.g., "08:30"
+  lastSummarySentDate?: Record<string, string>; // Map of classroom -> last sent YYYY-MM-DD
 }
 
 export async function getSettings(): Promise<SystemSettings> {
@@ -419,7 +754,10 @@ export async function getSettings(): Promise<SystemSettings> {
           adminPasscode: parsed.adminPasscode || "1234",
           schoolName: parsed.schoolName || process.env.NEXT_PUBLIC_SCHOOL_NAME || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)",
           schoolDistrict: parsed.schoolDistrict || process.env.NEXT_PUBLIC_SCHOOL_DISTRICT || "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1",
-          schoolLogo: parsed.schoolLogo || ""
+          schoolLogo: parsed.schoolLogo || "",
+          enableAutoSummary: parsed.enableAutoSummary ?? false,
+          summaryTime: parsed.summaryTime || "08:30",
+          lastSummarySentDate: parsed.lastSummarySentDate || {}
         };
       }
     } catch (e) {
@@ -434,7 +772,15 @@ export async function getSettings(): Promise<SystemSettings> {
     try {
       await fs.access(SETTINGS_FILE);
     } catch {
-      await fs.writeFile(SETTINGS_FILE, JSON.stringify({ classrooms: {}, lineChannelAccessToken: "", teacherPasscode: "1234", adminPasscode: "1234" }, null, 2));
+      await fs.writeFile(SETTINGS_FILE, JSON.stringify({ 
+        classrooms: {}, 
+        lineChannelAccessToken: "", 
+        teacherPasscode: "1234", 
+        adminPasscode: "1234",
+        enableAutoSummary: false,
+        summaryTime: "08:30",
+        lastSummarySentDate: {}
+      }, null, 2));
     }
     const data = await fs.readFile(SETTINGS_FILE, 'utf-8');
     const parsed = JSON.parse(data) as SystemSettings;
@@ -445,7 +791,10 @@ export async function getSettings(): Promise<SystemSettings> {
       adminPasscode: parsed.adminPasscode || "1234",
       schoolName: parsed.schoolName || process.env.NEXT_PUBLIC_SCHOOL_NAME || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)",
       schoolDistrict: parsed.schoolDistrict || process.env.NEXT_PUBLIC_SCHOOL_DISTRICT || "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1",
-      schoolLogo: parsed.schoolLogo || ""
+      schoolLogo: parsed.schoolLogo || "",
+      enableAutoSummary: parsed.enableAutoSummary ?? false,
+      summaryTime: parsed.summaryTime || "08:30",
+      lastSummarySentDate: parsed.lastSummarySentDate || {}
     };
   } catch (error) {
     console.error('Error reading settings:', error);
@@ -456,7 +805,10 @@ export async function getSettings(): Promise<SystemSettings> {
       adminPasscode: "1234",
       schoolName: process.env.NEXT_PUBLIC_SCHOOL_NAME || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)",
       schoolDistrict: process.env.NEXT_PUBLIC_SCHOOL_DISTRICT || "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1",
-      schoolLogo: ""
+      schoolLogo: "",
+      enableAutoSummary: false,
+      summaryTime: "08:30",
+      lastSummarySentDate: {}
     };
   } finally {
     release();
