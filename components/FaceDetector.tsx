@@ -185,6 +185,8 @@ export default function FaceDetector({
         if (is2D) {
           const descriptorsList = descData as number[][];
           descriptorsList.forEach((dArray) => {
+            // Validate descriptor length (face-api.js descriptors must be exactly 128 elements)
+            if (!dArray || dArray.length !== 128) return;
             const savedDescriptor = new Float32Array(dArray);
             const distance = faceapi.euclideanDistance(currentDescriptor, savedDescriptor);
             if (distance < minDistance) {
@@ -193,7 +195,10 @@ export default function FaceDetector({
             }
           });
         } else {
-          const savedDescriptor = new Float32Array(descData as number[]);
+          // Validate descriptor length (face-api.js descriptors must be exactly 128 elements)
+          const descriptorArray = descData as number[];
+          if (!descriptorArray || descriptorArray.length !== 128) return;
+          const savedDescriptor = new Float32Array(descriptorArray);
           const distance = faceapi.euclideanDistance(currentDescriptor, savedDescriptor);
           if (distance < minDistance) {
             minDistance = distance;
