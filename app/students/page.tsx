@@ -423,16 +423,34 @@ export default function StudentsPage() {
                     </div>
                   </div>
 
-                  {/* QR Code Container */}
-                  <div className="flex flex-col items-center gap-1.5 mb-2 bg-white p-2 rounded-xl border border-slate-100 shadow-sm">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=110x110&data=${encodeURIComponent(selectedStudentForCard.id)}`}
-                      alt="Student ID QR Code"
-                      className="w-[100px] h-[100px] object-contain"
-                      loading="lazy"
-                    />
-                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-wider">
-                      SCAN FOR ATTENDANCE
+                  {/* QR & Barcode Container */}
+                  <div className="w-[248px] flex flex-col gap-2 bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm">
+                    <div className="flex items-center justify-between gap-2.5">
+                      {/* QR Code */}
+                      <div className="flex flex-col items-center shrink-0">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(selectedStudentForCard.id)}`}
+                          alt="Student ID QR Code"
+                          className="w-[70px] h-[70px] object-contain"
+                          loading="lazy"
+                        />
+                      </div>
+                      
+                      {/* Divider line */}
+                      <div className="w-[1px] h-12 bg-slate-100"></div>
+
+                      {/* Barcode */}
+                      <div className="flex-1 flex flex-col items-center justify-center">
+                        <img
+                          src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(selectedStudentForCard.id)}&scale=3&rotate=N`}
+                          alt="Student ID Barcode"
+                          className="w-[110px] h-[50px] object-contain"
+                          loading="lazy"
+                        />
+                      </div>
+                    </div>
+                    <span className="text-[7px] font-black text-slate-400 uppercase tracking-wider text-center block mt-0.5">
+                      SCAN FOR ATTENDANCE (QR & BARCODE)
                     </span>
                   </div>
                 </div>

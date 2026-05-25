@@ -60,6 +60,7 @@ export default function CheckInPage() {
   const [countdown, setCountdown] = useState(3);
   const [isCountdownActive, setIsCountdownActive] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
+  const [students, setStudents] = useState<Student[]>([]);
 
   // 1. Fetch recent scan history on load
   const fetchRecentLogs = async () => {
@@ -194,6 +195,100 @@ export default function CheckInPage() {
     setEnableHealthScreening(val);
     localStorage.setItem("enableHealthScreening", String(val));
   };
+
+  // Fetch student list on mount for offline support and barcode matching
+  useEffect(() => {
+    async function loadStudents() {
+      try {
+        const res = await fetch("/api/students");
+        if (res.ok) {
+          const data = await res.json();
+          const list = data.students || [];
+          setStudents(list);
+          localStorage.setItem("cachedStudents", JSON.stringify(list));
+        } else {
+          throw new Error("HTTP failure");
+        }
+      } catch (e) {
+        const cached = localStorage.getItem("cachedStudents");
+        if (cached) {
+          setStudents(JSON.parse(cached));
+        }
+      }
+    }
+    loadStudents();
+  }, []);
+
+  const handleBarcodeScan = (scannedText: string) => {
+    if (isPaused) return;
+
+    // Search for student
+    const matched = students.find(
+      (s) => String(s.id).trim() === String(scannedText).trim()
+    );
+
+    if (matched) {
+      let checkInStatus: "present" | "late" = "present";
+      const timeNow = new Date();
+      const currentHours = timeNow.getHours();
+      const currentMinutes = timeNow.getMinutes();
+
+      const [hrHour, hrMin] = (homeroomTime || "08:00").split(":").map(Number);
+      if (currentHours > hrHour || (currentHours === hrHour && currentMinutes > hrMin)) {
+        checkInStatus = "late";
+      }
+
+      handleFaceMatch(matched, 0.0, checkInStatus);
+    } else {
+      handleFaceMatch(null, 1.0);
+    }
+  };
+
+  // Hardware Barcode Scanner Global Event Listener
+  useEffect(() => {
+    let buffer = "";
+    let lastKeyTime = Date.now();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const now = Date.now();
+      
+      // Determine if the user is typing in a text/password input box
+      const activeEl = document.activeElement;
+      const isInputActive = activeEl && (
+        activeEl.tagName === "INPUT" || 
+        activeEl.tagName === "TEXTAREA" || 
+        activeEl.getAttribute("contenteditable") === "true"
+      );
+
+      // If activeEl is a text/password input, skip intercepting (except our own input box)
+      if (isInputActive && activeEl.getAttribute("type") !== "checkbox" && activeEl.getAttribute("type") !== "range" && activeEl.id !== "manual-barcode-input") {
+        return;
+      }
+
+      // If key interval is more than 150ms, reset buffer (physical scanners dump keys in < 30ms)
+      if (now - lastKeyTime > 150) {
+        buffer = "";
+      }
+      lastKeyTime = now;
+
+      if (e.key === "Enter") {
+        if (buffer.length > 2) {
+          const scannedText = buffer.trim();
+          buffer = "";
+          handleBarcodeScan(scannedText);
+        }
+      } else {
+        if (e.key.length === 1) {
+          buffer += e.key;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [students, isPaused, homeroomTime, enableHealthScreening, healthStudent]);
 
   // 1.5-second auto-clear timer helper for scan matches
   const startAutoClearTimer = () => {
@@ -443,6 +538,43 @@ export default function CheckInPage() {
                 />
                 <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
               </label>
+            </div>
+          </div>
+
+          {/* Hardware Barcode Scanner Status Card */}
+          <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 5H1M21 5h2M3 10H1M21 10h2M3 15H1M21 15h2M3 20H1M21 20h2M7 5v14M11 5v14M15 5v14M19 5v14"/></svg>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-xs font-bold text-slate-900 dark:text-slate-100">🔌 เครื่องยิงบาร์โค้ดฮาร์ดแวร์ (USB/Bluetooth)</span>
+                  <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">ระบบดักจับการยิงรหัสพื้นหลังทำงานอยู่ ยิงบาร์โค้ดหรือ QR Code เพื่อเช็คชื่อได้ทันที</p>
+                </div>
+              </div>
+              <span className="inline-flex items-center gap-1 self-start sm:self-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                พร้อมใช้งาน
+              </span>
+            </div>
+            
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2">
+              <input
+                id="manual-barcode-input"
+                type="text"
+                placeholder="หรือป้อนรหัสนักเรียนด้วยตัวเองที่นี่ แล้วกด Enter..."
+                className="flex-1 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/45 px-3 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 placeholder-slate-400 focus:border-blue-500 focus:outline-none transition-colors shadow-inner"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    const val = e.currentTarget.value.trim();
+                    if (val) {
+                      handleBarcodeScan(val);
+                      e.currentTarget.value = "";
+                    }
+                  }
+                }}
+              />
             </div>
           </div>
 
