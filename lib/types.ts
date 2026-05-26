@@ -9,6 +9,9 @@ export interface Student {
   level?: 'kindergarten' | 'primary' | 'secondary';
   parentLineId?: string;
   avatarUrl?: string; // base64 or URL of student photo
+  bloodGroup?: string; // e.g. "A", "B", "O", "AB"
+  emergencyPhone?: string; // e.g. "081-234-5678"
+  medicalAlert?: string; // e.g. allergies or medical conditions
 }
 
 export interface Attendance {

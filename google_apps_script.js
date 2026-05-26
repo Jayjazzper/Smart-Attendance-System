@@ -16,11 +16,11 @@ function doPost(e) {
     var studentSheet = ss.getSheetByName("students");
     if (!studentSheet) {
       studentSheet = ss.insertSheet("students");
-      studentSheet.appendRow(["id", "name", "email", "faceDescriptor", "consentGiven", "registeredAt", "classroom", "level", "parentLineId", "avatarUrl"]);
+      studentSheet.appendRow(["id", "name", "email", "faceDescriptor", "consentGiven", "registeredAt", "classroom", "level", "parentLineId", "avatarUrl", "bloodGroup", "emergencyPhone", "medicalAlert"]);
     } else {
       // Ensure headers exist for all columns (upgrade existing sheets dynamically)
-      var studentHeaders = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 10).getValues()[0];
-      var requiredStudentHeaders = ["id", "name", "email", "faceDescriptor", "consentGiven", "registeredAt", "classroom", "level", "parentLineId", "avatarUrl"];
+      var studentHeaders = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 13).getValues()[0];
+      var requiredStudentHeaders = ["id", "name", "email", "faceDescriptor", "consentGiven", "registeredAt", "classroom", "level", "parentLineId", "avatarUrl", "bloodGroup", "emergencyPhone", "medicalAlert"];
       for (var h = 0; h < requiredStudentHeaders.length; h++) {
         var hName = requiredStudentHeaders[h];
         if (studentHeaders.indexOf(hName) === -1) {
@@ -75,6 +75,9 @@ function doPost(e) {
       var idxLevel = headers.indexOf("level");
       var idxParentLineId = headers.indexOf("parentLineId");
       var idxAvatarUrl = headers.indexOf("avatarUrl");
+      var idxBloodGroup = headers.indexOf("bloodGroup");
+      var idxEmergencyPhone = headers.indexOf("emergencyPhone");
+      var idxMedicalAlert = headers.indexOf("medicalAlert");
       
       var students = [];
       // Skip header row and skip any duplicate header rows or literal headers
@@ -99,7 +102,10 @@ function doPost(e) {
             classroom: idxClassroom !== -1 ? String(row[idxClassroom]) : "",
             level: idxLevel !== -1 ? String(row[idxLevel]) : "",
             parentLineId: idxParentLineId !== -1 ? String(row[idxParentLineId]) : "",
-            avatarUrl: idxAvatarUrl !== -1 ? String(row[idxAvatarUrl]) : ""
+            avatarUrl: idxAvatarUrl !== -1 ? String(row[idxAvatarUrl]) : "",
+            bloodGroup: idxBloodGroup !== -1 ? String(row[idxBloodGroup]) : "",
+            emergencyPhone: idxEmergencyPhone !== -1 ? String(row[idxEmergencyPhone]) : "",
+            medicalAlert: idxMedicalAlert !== -1 ? String(row[idxMedicalAlert]) : ""
           });
         }
       }
@@ -119,7 +125,7 @@ function doPost(e) {
       if (exists) {
         result = { success: false, error: "Student ID already exists" };
       } else {
-        var headers = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 10).getValues()[0];
+        var headers = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 13).getValues()[0];
         var nextRow = studentSheet.getLastRow() + 1;
         var valuesMap = {
           "id": student.id,
@@ -131,7 +137,10 @@ function doPost(e) {
           "classroom": student.classroom || "",
           "level": student.level || "",
           "parentLineId": student.parentLineId || "",
-          "avatarUrl": student.avatarUrl || ""
+          "avatarUrl": student.avatarUrl || "",
+          "bloodGroup": student.bloodGroup || "",
+          "emergencyPhone": student.emergencyPhone || "",
+          "medicalAlert": student.medicalAlert || ""
         };
         
         for (var c = 0; c < headers.length; c++) {
@@ -151,9 +160,12 @@ function doPost(e) {
       var level = postData.level;
       var parentLineId = postData.parentLineId;
       var avatarUrl = postData.avatarUrl;
+      var bloodGroup = postData.bloodGroup;
+      var emergencyPhone = postData.emergencyPhone;
+      var medicalAlert = postData.medicalAlert;
       
       var data = studentSheet.getDataRange().getValues();
-      var headers = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 10).getValues()[0];
+      var headers = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 13).getValues()[0];
       
       var idxId = headers.indexOf("id");
       var idxName = headers.indexOf("name");
@@ -162,6 +174,9 @@ function doPost(e) {
       var idxLevel = headers.indexOf("level");
       var idxParentLineId = headers.indexOf("parentLineId");
       var idxAvatarUrl = headers.indexOf("avatarUrl");
+      var idxBloodGroup = headers.indexOf("bloodGroup");
+      var idxEmergencyPhone = headers.indexOf("emergencyPhone");
+      var idxMedicalAlert = headers.indexOf("medicalAlert");
       
       var updated = false;
       for (var i = 1; i < data.length; i++) {
@@ -172,6 +187,9 @@ function doPost(e) {
           if (idxLevel !== -1 && level !== undefined) studentSheet.getRange(i + 1, idxLevel + 1).setValue(level);
           if (idxParentLineId !== -1 && parentLineId !== undefined) studentSheet.getRange(i + 1, idxParentLineId + 1).setValue(parentLineId);
           if (idxAvatarUrl !== -1 && avatarUrl !== undefined) studentSheet.getRange(i + 1, idxAvatarUrl + 1).setValue(avatarUrl);
+          if (idxBloodGroup !== -1 && bloodGroup !== undefined) studentSheet.getRange(i + 1, idxBloodGroup + 1).setValue(bloodGroup);
+          if (idxEmergencyPhone !== -1 && emergencyPhone !== undefined) studentSheet.getRange(i + 1, idxEmergencyPhone + 1).setValue(emergencyPhone);
+          if (idxMedicalAlert !== -1 && medicalAlert !== undefined) studentSheet.getRange(i + 1, idxMedicalAlert + 1).setValue(medicalAlert);
           updated = true;
           break;
         }

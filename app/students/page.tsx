@@ -449,15 +449,50 @@ export default function StudentsPage() {
                 <div className="absolute -top-10 -left-10 w-24 h-24 rounded-full bg-blue-400/10 blur-xl pointer-events-none"></div>
                 <div className="absolute -bottom-10 -right-10 w-24 h-24 rounded-full bg-indigo-400/10 blur-xl pointer-events-none"></div>
 
-                {/* RFID micro-chip graphics accent */}
-                <div className="absolute top-[88px] right-5 w-8 h-7 rounded-md bg-gradient-to-tr from-amber-300 via-yellow-400 to-amber-500 border border-amber-600/20 p-1 flex flex-col justify-between shadow-sm opacity-70 pointer-events-none">
-                  <div className="h-[1px] bg-amber-800/25 w-full"></div>
-                  <div className="flex justify-between h-full py-0.5">
-                    <div className="w-[1px] bg-amber-800/25 h-full"></div>
-                    <div className="w-[1px] bg-amber-800/25 h-full"></div>
-                    <div className="w-[1px] bg-amber-800/25 h-full"></div>
-                  </div>
-                  <div className="h-[1px] bg-amber-800/25 w-full"></div>
+                {/* Emergency & Medical Info Badge (Functional - replaces gold chip) */}
+                <div className="absolute top-[88px] right-4 flex flex-col items-end gap-1.5">
+                  {selectedStudentForCard.bloodGroup || selectedStudentForCard.emergencyPhone || selectedStudentForCard.medicalAlert ? (
+                    <>
+                      {/* Blood Group Pill */}
+                      {selectedStudentForCard.bloodGroup && (
+                        <div className="flex items-center gap-1 bg-red-50 border border-red-200 rounded-md px-1.5 py-0.5 shadow-sm">
+                          <span className="text-[8px] text-red-500 leading-none">🩸</span>
+                          <span className="text-[8px] font-black text-red-700 font-mono leading-none">{selectedStudentForCard.bloodGroup}</span>
+                        </div>
+                      )}
+
+                      {/* Emergency Phone Pill */}
+                      {selectedStudentForCard.emergencyPhone && (
+                        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 rounded-md px-1.5 py-0.5 shadow-sm">
+                          <span className="text-[8px] text-slate-500 leading-none">📞</span>
+                          <span className="text-[7.5px] font-bold text-slate-700 font-mono leading-none">
+                            {selectedStudentForCard.emergencyPhone}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Medical Alert Pill */}
+                      {selectedStudentForCard.medicalAlert && (
+                        <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 rounded-md px-1.5 py-0.5 shadow-sm max-w-[90px]" title={selectedStudentForCard.medicalAlert}>
+                          <span className="text-[8px] text-amber-500 leading-none">⚠️</span>
+                          <span className="text-[7.5px] font-bold text-amber-800 leading-none truncate">
+                            {selectedStudentForCard.medicalAlert}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* Default placeholder graphic */
+                    <div className="w-8 h-7 rounded-md bg-gradient-to-tr from-amber-300 via-yellow-400 to-amber-500 border border-amber-600/20 p-1 flex flex-col justify-between shadow-sm opacity-60 pointer-events-none">
+                      <div className="h-[1px] bg-amber-800/25 w-full"></div>
+                      <div className="flex justify-between h-full py-0.5">
+                        <div className="w-[1px] bg-amber-800/25 h-full"></div>
+                        <div className="w-[1px] bg-amber-800/25 h-full"></div>
+                        <div className="w-[1px] bg-amber-800/25 h-full"></div>
+                      </div>
+                      <div className="h-[1px] bg-amber-800/25 w-full"></div>
+                    </div>
+                  )}
                 </div>
 
                 {/* School Header Stripe */}

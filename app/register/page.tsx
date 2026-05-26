@@ -104,6 +104,9 @@ export default function RegisterPage() {
     consent: false,
     parentLineId: "",
     avatarUrl: "",
+    bloodGroup: "",
+    emergencyPhone: "",
+    medicalAlert: "",
   });
   const [status, setStatus] = useState<"idle" | "capturing" | "scanning" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
@@ -263,6 +266,9 @@ export default function RegisterPage() {
             level: formData.division,
             parentLineId: formData.parentLineId,
             avatarUrl: formData.avatarUrl,
+            bloodGroup: formData.bloodGroup,
+            emergencyPhone: formData.emergencyPhone,
+            medicalAlert: formData.medicalAlert,
           }),
         });
 
@@ -456,6 +462,62 @@ export default function RegisterPage() {
                 </p>
               </div>
 
+              {/* Blood Group & Emergency Contact Section */}
+              <div className="grid grid-cols-2 gap-4 border-t border-slate-100 pt-3">
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="bloodGroup" className="text-xs font-bold text-slate-700">
+                    กรุ๊ปเลือด (Blood Group)
+                  </label>
+                  <select
+                    id="bloodGroup"
+                    name="bloodGroup"
+                    value={formData.bloodGroup}
+                    onChange={handleChange}
+                    disabled={status === "capturing" || status === "scanning" || status === "success"}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm focus:border-blue-500 focus:outline-none transition-colors"
+                  >
+                    <option value="">-- ไม่ระบุ --</option>
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="O">O</option>
+                    <option value="AB">AB</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label htmlFor="emergencyPhone" className="text-xs font-bold text-slate-700">
+                    เบอร์ติดต่อฉุกเฉินผู้ปกครอง
+                  </label>
+                  <input
+                    type="tel"
+                    id="emergencyPhone"
+                    name="emergencyPhone"
+                    placeholder="เช่น 081-234-5678"
+                    value={formData.emergencyPhone}
+                    onChange={handleChange}
+                    disabled={status === "capturing" || status === "scanning" || status === "success"}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm placeholder-slate-400 focus:border-blue-500 focus:outline-none transition-colors"
+                  />
+                </div>
+              </div>
+
+              {/* Medical Alert / Allergy */}
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="medicalAlert" className="text-xs font-bold text-slate-700">
+                  โรคประจำตัว / ประวัติแพ้ยา (ถ้ามี)
+                </label>
+                <input
+                  type="text"
+                  id="medicalAlert"
+                  name="medicalAlert"
+                  placeholder="เช่น หอบหืด, แพ้ยาเพนิซิลลิน (ไม่มีให้ใส่ -)"
+                  value={formData.medicalAlert}
+                  onChange={handleChange}
+                  disabled={status === "capturing" || status === "scanning" || status === "success"}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm placeholder-slate-400 focus:border-blue-500 focus:outline-none transition-colors"
+                />
+              </div>
+
               {/* Division & Grade & Room */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5 col-span-2">
@@ -567,6 +629,9 @@ export default function RegisterPage() {
                         consent: false,
                         parentLineId: "",
                         avatarUrl: "",
+                        bloodGroup: "",
+                        emergencyPhone: "",
+                        medicalAlert: "",
                       });
                       setStatus("idle");
                     }}
