@@ -400,10 +400,12 @@ function doPost(e) {
       }
       var data = settingsSheet.getDataRange().getValues();
       var settingsStr = "";
+      var schoolLogo = "";
       for (var i = 1; i < data.length; i++) {
         if (data[i][0] === "config") {
           settingsStr = data[i][1];
-          break;
+        } else if (data[i][0] === "schoolLogo") {
+          schoolLogo = data[i][1];
         }
       }
       var settingsObj = {};
@@ -414,6 +416,9 @@ function doPost(e) {
           console.error("Error parsing settings:", e);
         }
       }
+      if (schoolLogo) {
+        settingsObj.schoolLogo = schoolLogo;
+      }
       result = { success: true, settings: settingsObj };
       
     } else if (action === "saveSettings") {
@@ -422,14 +427,21 @@ function doPost(e) {
         settingsSheet = ss.insertSheet("settings");
         settingsSheet.appendRow(["key", "value"]);
       }
-      var settings = postData.settings;
+      var settings = postData.settings || {};
+      var schoolLogo = settings.schoolLogo || "";
+      
+      // Delete schoolLogo from settings object to keep config cell size small
+      delete settings.schoolLogo;
+      
       var settingsStr = JSON.stringify(settings);
       var data = settingsSheet.getDataRange().getValues();
       var foundRow = -1;
+      var foundLogoRow = -1;
       for (var i = 1; i < data.length; i++) {
         if (data[i][0] === "config") {
           foundRow = i + 1;
-          break;
+        } else if (data[i][0] === "schoolLogo") {
+          foundLogoRow = i + 1;
         }
       }
       
@@ -437,6 +449,12 @@ function doPost(e) {
         settingsSheet.getRange(foundRow, 2).setValue(settingsStr);
       } else {
         settingsSheet.appendRow(["config", settingsStr]);
+      }
+      
+      if (foundLogoRow !== -1) {
+        settingsSheet.getRange(foundLogoRow, 2).setValue(schoolLogo);
+      } else {
+        settingsSheet.appendRow(["schoolLogo", schoolLogo]);
       }
       result = { success: true };
     }
