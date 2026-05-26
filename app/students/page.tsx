@@ -407,14 +407,17 @@ export default function StudentsPage() {
                 print-color-adjust: exact !important;
                 color-adjust: exact !important;
               }
+              .print-wrapper-reset {
+                display: contents !important;
+              }
               .no-print {
                 display: none !important;
               }
             }
           `}</style>
           
-          <div className="my-auto w-full max-w-md rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xl flex flex-col gap-4 no-print">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div className="my-auto w-full max-w-md rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xl flex flex-col gap-4 print-wrapper-reset">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 no-print">
               <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="12" cy="10" r="3"/><path d="M7 21v-2a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v2"/></svg>
                 บัตรประจำตัวนักเรียนดิจิทัล
@@ -428,7 +431,7 @@ export default function StudentsPage() {
             </div>
 
             {/* Virtual Card Wrapper */}
-            <div className="flex justify-center py-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800/50">
+            <div className="flex justify-center py-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-100 dark:border-slate-800/50 print-wrapper-reset">
               {/* Actual Virtual Card */}
               <div
                 id="student-card-print-area"
@@ -583,7 +586,7 @@ export default function StudentsPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3 mt-2">
+            <div className="flex gap-3 mt-2 no-print">
               <button
                 onClick={() => setSelectedStudentForCard(null)}
                 className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 py-2.5 text-xs font-bold text-slate-500 dark:text-slate-450 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
