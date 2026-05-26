@@ -26,7 +26,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   try {
     const { id: studentId } = await params;
     const body = await req.json();
-    const { name, email, classroom, level, parentLineId } = body;
+    const { name, email, classroom, level, parentLineId, avatarUrl } = body;
 
     if (!name || !email || !classroom || !level) {
       return NextResponse.json({ error: "กรุณาระบุชื่อ อีเมล ระดับชั้น และห้องเรียน" }, { status: 400 });
@@ -70,7 +70,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       email.trim(),
       classroom.trim(),
       level.trim() as 'kindergarten' | 'primary' | 'secondary',
-      parentLineId ? parentLineId.trim() : undefined
+      parentLineId ? parentLineId.trim() : undefined,
+      avatarUrl ? avatarUrl.trim() : undefined
     );
     if (!success) {
       return NextResponse.json({ error: "ไม่สามารถอัปเดตข้อมูลนักเรียนได้" }, { status: 404 });

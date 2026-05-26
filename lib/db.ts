@@ -181,12 +181,13 @@ export async function updateStudent(
   email: string,
   classroom?: string,
   level?: 'kindergarten' | 'primary' | 'secondary',
-  parentLineId?: string
+  parentLineId?: string,
+  avatarUrl?: string
 ): Promise<boolean> {
   // 1. Try Google Sheets Web App if active
   if (isGoogleSheetsActive()) {
     try {
-      const res = await callGoogleScript('updateStudent', { id, name, email, classroom, level, parentLineId });
+      const res = await callGoogleScript('updateStudent', { id, name, email, classroom, level, parentLineId, avatarUrl });
       if (res) {
         return !!res.success;
       }
@@ -211,6 +212,7 @@ export async function updateStudent(
     if (classroom !== undefined) students[index].classroom = classroom;
     if (level !== undefined) students[index].level = level;
     if (parentLineId !== undefined) students[index].parentLineId = parentLineId;
+    if (avatarUrl !== undefined) students[index].avatarUrl = avatarUrl;
 
     await fs.writeFile(STUDENTS_FILE, JSON.stringify({ students }, null, 2));
 

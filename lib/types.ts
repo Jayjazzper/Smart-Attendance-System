@@ -8,6 +8,7 @@ export interface Student {
   classroom?: string; // e.g., "ป.4/2"
   level?: 'kindergarten' | 'primary' | 'secondary';
   parentLineId?: string;
+  avatarUrl?: string; // base64 or URL of student photo
 }
 
 export interface Attendance {

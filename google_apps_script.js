@@ -16,11 +16,11 @@ function doPost(e) {
     var studentSheet = ss.getSheetByName("students");
     if (!studentSheet) {
       studentSheet = ss.insertSheet("students");
-      studentSheet.appendRow(["id", "name", "email", "faceDescriptor", "consentGiven", "registeredAt", "classroom", "level", "parentLineId"]);
+      studentSheet.appendRow(["id", "name", "email", "faceDescriptor", "consentGiven", "registeredAt", "classroom", "level", "parentLineId", "avatarUrl"]);
     } else {
       // Ensure headers exist for all columns (upgrade existing sheets dynamically)
-      var studentHeaders = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 9).getValues()[0];
-      var requiredStudentHeaders = ["id", "name", "email", "faceDescriptor", "consentGiven", "registeredAt", "classroom", "level", "parentLineId"];
+      var studentHeaders = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 10).getValues()[0];
+      var requiredStudentHeaders = ["id", "name", "email", "faceDescriptor", "consentGiven", "registeredAt", "classroom", "level", "parentLineId", "avatarUrl"];
       for (var h = 0; h < requiredStudentHeaders.length; h++) {
         var hName = requiredStudentHeaders[h];
         if (studentHeaders.indexOf(hName) === -1) {
@@ -74,6 +74,7 @@ function doPost(e) {
       var idxClassroom = headers.indexOf("classroom");
       var idxLevel = headers.indexOf("level");
       var idxParentLineId = headers.indexOf("parentLineId");
+      var idxAvatarUrl = headers.indexOf("avatarUrl");
       
       var students = [];
       // Skip header row and skip any duplicate header rows or literal headers
@@ -97,7 +98,8 @@ function doPost(e) {
             registeredAt: idxRegisteredAt !== -1 ? String(row[idxRegisteredAt]) : "",
             classroom: idxClassroom !== -1 ? String(row[idxClassroom]) : "",
             level: idxLevel !== -1 ? String(row[idxLevel]) : "",
-            parentLineId: idxParentLineId !== -1 ? String(row[idxParentLineId]) : ""
+            parentLineId: idxParentLineId !== -1 ? String(row[idxParentLineId]) : "",
+            avatarUrl: idxAvatarUrl !== -1 ? String(row[idxAvatarUrl]) : ""
           });
         }
       }
@@ -117,7 +119,7 @@ function doPost(e) {
       if (exists) {
         result = { success: false, error: "Student ID already exists" };
       } else {
-        var headers = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 9).getValues()[0];
+        var headers = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 10).getValues()[0];
         var nextRow = studentSheet.getLastRow() + 1;
         var valuesMap = {
           "id": student.id,
@@ -128,7 +130,8 @@ function doPost(e) {
           "registeredAt": student.registeredAt || new Date().toISOString(),
           "classroom": student.classroom || "",
           "level": student.level || "",
-          "parentLineId": student.parentLineId || ""
+          "parentLineId": student.parentLineId || "",
+          "avatarUrl": student.avatarUrl || ""
         };
         
         for (var c = 0; c < headers.length; c++) {
@@ -147,9 +150,10 @@ function doPost(e) {
       var classroom = postData.classroom;
       var level = postData.level;
       var parentLineId = postData.parentLineId;
+      var avatarUrl = postData.avatarUrl;
       
       var data = studentSheet.getDataRange().getValues();
-      var headers = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 9).getValues()[0];
+      var headers = studentSheet.getRange(1, 1, 1, studentSheet.getLastColumn() || 10).getValues()[0];
       
       var idxId = headers.indexOf("id");
       var idxName = headers.indexOf("name");
@@ -157,6 +161,7 @@ function doPost(e) {
       var idxClassroom = headers.indexOf("classroom");
       var idxLevel = headers.indexOf("level");
       var idxParentLineId = headers.indexOf("parentLineId");
+      var idxAvatarUrl = headers.indexOf("avatarUrl");
       
       var updated = false;
       for (var i = 1; i < data.length; i++) {
@@ -166,6 +171,7 @@ function doPost(e) {
           if (idxClassroom !== -1 && classroom !== undefined) studentSheet.getRange(i + 1, idxClassroom + 1).setValue(classroom);
           if (idxLevel !== -1 && level !== undefined) studentSheet.getRange(i + 1, idxLevel + 1).setValue(level);
           if (idxParentLineId !== -1 && parentLineId !== undefined) studentSheet.getRange(i + 1, idxParentLineId + 1).setValue(parentLineId);
+          if (idxAvatarUrl !== -1 && avatarUrl !== undefined) studentSheet.getRange(i + 1, idxAvatarUrl + 1).setValue(avatarUrl);
           updated = true;
           break;
         }

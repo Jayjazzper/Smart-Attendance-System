@@ -20,7 +20,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, name, email, faceDescriptor, consentGiven, classroom, level, parentLineId } = body;
+    const { id, name, email, faceDescriptor, consentGiven, classroom, level, parentLineId, avatarUrl } = body;
 
     // Validate request body
     if (!id || !name || !email || !faceDescriptor || !consentGiven || !classroom || !level) {
@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
       classroom: classroom.trim(),
       level: level.trim() as 'kindergarten' | 'primary' | 'secondary',
       parentLineId: parentLineId ? parentLineId.trim() : undefined,
+      avatarUrl: avatarUrl ? avatarUrl.trim() : undefined,
     };
 
     const success = await saveStudent(newStudent);

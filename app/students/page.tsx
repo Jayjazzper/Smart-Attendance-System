@@ -268,7 +268,7 @@ export default function StudentsPage() {
                         <td className="py-3.5 px-2 text-slate-900 dark:text-white font-bold">{student.id}</td>
                         <td className="py-3.5 px-2 font-bold text-slate-900 dark:text-white">{student.name}</td>
                         <td className="py-3.5 px-2">
-                          {student.classroom ? (
+                          {student.classroom && String(student.classroom).toLowerCase() !== "true" && String(student.classroom).toLowerCase() !== "false" ? (
                             <span className="rounded bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/50 px-2 py-0.5 text-[10px] font-bold text-blue-600 dark:text-blue-400">
                               {student.classroom}
                             </span>
@@ -387,7 +387,6 @@ export default function StudentsPage() {
       {/* Digital Student ID Card Modal */}
       {selectedStudentForCard && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in print:bg-transparent print:p-0">
-          {/* Custom style tag for print layout formatting */}
           <style>{`
             @media print {
               body * {
@@ -403,6 +402,9 @@ export default function StudentsPage() {
                 transform: translate(-50%, -50%) scale(1.5);
                 box-shadow: none !important;
                 border: 1px solid #cbd5e1 !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
               }
               .no-print {
                 display: none !important;
@@ -429,30 +431,53 @@ export default function StudentsPage() {
               {/* Actual Virtual Card */}
               <div
                 id="student-card-print-area"
-                className="w-[280px] h-[430px] rounded-2xl bg-white text-slate-800 border-2 border-blue-500/30 shadow-lg flex flex-col relative overflow-hidden bg-cover bg-center"
+                className="w-[280px] h-[430px] rounded-2xl bg-white text-slate-800 border border-slate-200/80 shadow-xl flex flex-col relative overflow-hidden transition-all duration-300 animate-fade-in"
                 style={{
-                  backgroundImage: "linear-gradient(135deg, rgba(239, 246, 255, 0.5) 0%, rgba(255, 255, 255, 0.9) 100%)"
+                  backgroundImage: "radial-gradient(circle at 10% 20%, rgba(238, 242, 255, 0.7) 0%, rgba(255, 255, 255, 0.95) 100%)",
+                  WebkitPrintColorAdjust: "exact",
+                  printColorAdjust: "exact"
                 }}
               >
+                {/* Tech microgrid pattern watermark overlay */}
+                <div className="absolute inset-0 bg-[linear-gradient(rgba(99,102,241,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(99,102,241,0.03)_1px,transparent_1px)] bg-[size:14px_14px] pointer-events-none"></div>
+
+                {/* Ambient glow decoration blobs */}
+                <div className="absolute -top-10 -left-10 w-24 h-24 rounded-full bg-blue-400/10 blur-xl pointer-events-none"></div>
+                <div className="absolute -bottom-10 -right-10 w-24 h-24 rounded-full bg-indigo-400/10 blur-xl pointer-events-none"></div>
+
+                {/* RFID micro-chip graphics accent */}
+                <div className="absolute top-[88px] right-5 w-8 h-7 rounded-md bg-gradient-to-tr from-amber-300 via-yellow-400 to-amber-500 border border-amber-600/20 p-1 flex flex-col justify-between shadow-sm opacity-70 pointer-events-none">
+                  <div className="h-[1px] bg-amber-800/25 w-full"></div>
+                  <div className="flex justify-between h-full py-0.5">
+                    <div className="w-[1px] bg-amber-800/25 h-full"></div>
+                    <div className="w-[1px] bg-amber-800/25 h-full"></div>
+                    <div className="w-[1px] bg-amber-800/25 h-full"></div>
+                  </div>
+                  <div className="h-[1px] bg-amber-800/25 w-full"></div>
+                </div>
+
                 {/* School Header Stripe */}
-                <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-3 text-white flex items-center gap-2 relative">
+                <div 
+                  className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-3 text-white flex items-center gap-2.5 relative border-b border-indigo-500/20"
+                  style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
+                >
                   {/* School Logo */}
                   {schoolSettings.schoolLogo ? (
                     <img
                       src={schoolSettings.schoolLogo}
                       alt="Logo"
-                      className="w-8 h-8 rounded-full object-cover bg-white p-0.5 shrink-0 border border-white/20"
+                      className="w-9 h-9 rounded-full object-cover bg-white p-0.5 shrink-0 border border-white/10"
                     />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0 border border-white/20">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-white"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
+                    <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center shrink-0 border border-white/15">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-indigo-300"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/></svg>
                     </div>
                   )}
                   <div className="flex flex-col min-w-0 text-left">
-                    <span className="text-[10px] font-extrabold leading-none truncate block">
+                    <span className="text-[10px] font-black leading-tight tracking-wide truncate block text-slate-100">
                       {schoolSettings.schoolName}
                     </span>
-                    <span className="text-[7px] text-blue-100 leading-none truncate block mt-0.5 font-medium">
+                    <span className="text-[7px] text-slate-450 leading-none truncate block mt-0.5 font-bold tracking-wider">
                       {schoolSettings.schoolDistrict}
                     </span>
                   </div>
@@ -461,64 +486,98 @@ export default function StudentsPage() {
                 </div>
 
                 {/* Card Body */}
-                <div className="flex-1 flex flex-col items-center justify-between p-4 pt-5">
+                <div className="flex-1 flex flex-col items-center justify-between p-4 pt-5 z-10">
                   {/* Photo Container */}
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-24 h-24 rounded-full border-4 border-white shadow-md bg-gradient-to-tr from-blue-100 to-indigo-50 flex items-center justify-center overflow-hidden">
-                      {/* Generates gender-neutral/avatar icon based on name prefix */}
-                      {selectedStudentForCard.name.includes("หญิง") || selectedStudentForCard.name.includes("สาว") || selectedStudentForCard.name.includes("ด.ญ.") ? (
-                        // Female Avatar Icon SVG
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-16 h-16 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="8" r="4"/><path d="M12 12c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                      ) : (
-                        // Male Avatar Icon SVG
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-16 h-16 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="8" r="4"/><path d="M12 12c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                      )}
+                  <div className="flex flex-col items-center gap-2.5">
+                    {/* Glowing Premium Border Ring */}
+                    <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-cyan-400 via-indigo-500 to-purple-500 shadow-md">
+                      <div className="w-full h-full rounded-full border-2 border-white/95 bg-gradient-to-tr from-blue-50 to-indigo-50 flex items-center justify-center overflow-hidden">
+                        {selectedStudentForCard.avatarUrl ? (
+                          <img
+                            src={selectedStudentForCard.avatarUrl}
+                            alt={selectedStudentForCard.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : selectedStudentForCard.name.includes("หญิง") || selectedStudentForCard.name.includes("สาว") || selectedStudentForCard.name.includes("ด.ญ.") ? (
+                          // Female avatar with premium gradient styling
+                          <div className="w-full h-full bg-gradient-to-br from-pink-100 to-rose-200 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-14 h-14 text-rose-500/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="8" r="4"/><path d="M12 12c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                          </div>
+                        ) : (
+                          // Male avatar with premium gradient styling
+                          <div className="w-full h-full bg-gradient-to-br from-sky-100 to-blue-200 flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-14 h-14 text-blue-500/80" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="8" r="4"/><path d="M12 12c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                          </div>
+                        )}
+                      </div>
                     </div>
                     
                     {/* Student Info */}
                     <div className="text-center mt-1">
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">STUDENT CARD</span>
-                      <h4 className="text-sm font-extrabold text-slate-800 leading-tight mt-0.5">{selectedStudentForCard.name}</h4>
-                      <p className="text-[10px] text-slate-500 font-bold mt-1">
-                        ชั้นเรียน: {selectedStudentForCard.classroom || "-"} | รหัส: {selectedStudentForCard.id}
-                      </p>
+                      <span className="text-[8px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-[0.2em] font-mono block">STUDENT IDENTIFICATION</span>
+                      <h4 className="text-sm font-black text-slate-800 leading-tight mt-1">{selectedStudentForCard.name}</h4>
+                      
+                      {/* Classroom & ID Pills Layout */}
+                      <div className="flex items-center gap-1.5 justify-center mt-2.5">
+                        {/* Classroom Pill */}
+                        <span className="bg-blue-50/80 text-blue-700 border border-blue-100/80 rounded-lg px-2.5 py-0.5 text-[9px] font-extrabold flex items-center gap-1 shadow-sm">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                          ชั้น: {
+                            (selectedStudentForCard.classroom && 
+                            String(selectedStudentForCard.classroom).toLowerCase() !== "true" && 
+                            String(selectedStudentForCard.classroom).toLowerCase() !== "false") 
+                              ? String(selectedStudentForCard.classroom) 
+                              : "-"
+                          }
+                        </span>
+                        {/* ID Pill */}
+                        <span className="bg-slate-50/80 text-slate-700 border border-slate-200/60 rounded-lg px-2.5 py-0.5 text-[9px] font-extrabold font-mono flex items-center gap-1 shadow-sm">
+                          ID: {selectedStudentForCard.id}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
-                  {/* QR & Barcode Container */}
-                  <div className="w-[248px] flex flex-col gap-2 bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm">
-                    <div className="flex items-center justify-between gap-2.5">
+                  {/* QR & Barcode Container (High-tech style) */}
+                  <div className="w-[248px] flex flex-col gap-2 bg-slate-50/50 backdrop-blur-md p-2.5 rounded-2xl border border-slate-200/40 shadow-sm relative">
+                    <div className="flex items-center justify-between gap-2">
                       {/* QR Code */}
-                      <div className="flex flex-col items-center shrink-0">
+                      <div className="flex flex-col items-center shrink-0 p-0.5 bg-white rounded-lg border border-slate-100">
                         <img
                           src={`https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(selectedStudentForCard.id)}`}
                           alt="Student ID QR Code"
-                          className="w-[70px] h-[70px] object-contain"
+                          className="w-[65px] h-[65px] object-contain"
                           loading="lazy"
                         />
                       </div>
                       
                       {/* Divider line */}
-                      <div className="w-[1px] h-12 bg-slate-100"></div>
+                      <div className="w-[1px] h-10 bg-slate-200/80"></div>
 
                       {/* Barcode */}
-                      <div className="flex-1 flex flex-col items-center justify-center">
+                      <div className="flex-1 flex flex-col items-center justify-center p-1 bg-white rounded-lg border border-slate-100">
                         <img
                           src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(selectedStudentForCard.id)}&scale=3&rotate=N`}
                           alt="Student ID Barcode"
-                          className="w-[110px] h-[50px] object-contain"
+                          className="w-[110px] h-[45px] object-contain"
                           loading="lazy"
                         />
                       </div>
                     </div>
-                    <span className="text-[7px] font-black text-slate-400 uppercase tracking-wider text-center block mt-0.5">
-                      SCAN FOR ATTENDANCE (QR & BARCODE)
+                    <span className="text-[6.5px] font-black text-slate-400 uppercase tracking-widest text-center block mt-0.5">
+                      ★ SMART SCAN ACCESS PANEL ★
                     </span>
                   </div>
                 </div>
 
                 {/* Card Footer Design */}
-                <div className="h-2 bg-gradient-to-r from-blue-600 to-indigo-700 w-full"></div>
+                <div 
+                  className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 py-1.5 px-3 flex items-center justify-between border-t border-indigo-500/10"
+                  style={{ WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
+                >
+                  <span className="text-[6px] font-bold text-slate-400 tracking-widest uppercase">SMART ID CARD</span>
+                  <span className="text-[6px] font-bold text-indigo-400 tracking-wider">SECURE CAMPUS SYSTEM</span>
+                </div>
               </div>
             </div>
 

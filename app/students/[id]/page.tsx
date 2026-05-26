@@ -90,6 +90,7 @@ export default function EditStudentPage() {
     grade: "ประถมศึกษาปีที่ 1",
     room: "ห้อง 1",
     parentLineId: "",
+    avatarUrl: "",
   });
   const [loading, setLoading] = useState(true);
   const [loadingUser, setLoadingUser] = useState(true);
@@ -97,6 +98,77 @@ export default function EditStudentPage() {
   const [originalClassroom, setOriginalClassroom] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [compressing, setCompressing] = useState(false);
+
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 150;
+          const MAX_HEIGHT = 150;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+          resolve(dataUrl);
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      alert("กรุณาเลือกไฟล์ภาพเท่านั้น");
+      return;
+    }
+
+    setCompressing(true);
+    try {
+      const compressedBase64 = await compressImage(file);
+      setFormData(prev => ({
+        ...prev,
+        avatarUrl: compressedBase64
+      }));
+    } catch (err) {
+      console.error("Image compression error:", err);
+      alert("เกิดข้อผิดพลาดในการประมวลผลรูปภาพ");
+    } finally {
+      setCompressing(false);
+    }
+  };
+
+  const handleRemoveAvatar = () => {
+    setFormData(prev => ({
+      ...prev,
+      avatarUrl: ""
+    }));
+  };
 
   // 1. Fetch live student info and current user session on load
   useEffect(() => {
@@ -116,6 +188,7 @@ export default function EditStudentPage() {
             grade: parsed.grade,
             room: parsed.room,
             parentLineId: student.parentLineId || "",
+            avatarUrl: student.avatarUrl || "",
           });
         } else {
           setErrorMessage("ไม่สามารถดึงข้อมูลนักเรียนรหัสนี้ได้");
@@ -195,6 +268,7 @@ export default function EditStudentPage() {
           classroom: getAbbreviatedClassroom(formData.grade, formData.room),
           level: formData.division,
           parentLineId: formData.parentLineId,
+          avatarUrl: formData.avatarUrl,
         }),
       });
 
@@ -284,6 +358,53 @@ export default function EditStudentPage() {
                 disabled
                 className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-400 font-semibold cursor-not-allowed"
               />
+            </div>
+
+            {/* Student Profile Picture (Avatar) */}
+            <div className="flex flex-col gap-1.5 border-b border-slate-100 pb-4">
+              <label className="text-xs font-bold text-slate-700">รูปภาพโปรไฟล์นักเรียน (Avatar)</label>
+              <div className="flex items-center gap-4 mt-1">
+                {/* Avatar Preview */}
+                <div className="w-16 h-16 rounded-full overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0 shadow-inner">
+                  {formData.avatarUrl ? (
+                    <img
+                      src={formData.avatarUrl}
+                      alt="Student Avatar"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="8" r="4"/><path d="M12 12c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                  )}
+                </div>
+                {/* File Input & Controls */}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    <label className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 dark:bg-blue-950/20 dark:text-blue-400 dark:hover:bg-blue-950/40 rounded-xl text-xs font-bold transition-all cursor-pointer relative">
+                      {compressing ? "กำลังบีบอัดรูป..." : "เลือกรูปภาพโปรไฟล์"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleAvatarChange}
+                        disabled={status === "saving" || status === "success" || compressing}
+                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                      />
+                    </label>
+                    {formData.avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveAvatar}
+                        disabled={status === "saving" || status === "success" || compressing}
+                        className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/20 dark:text-red-400 dark:hover:bg-red-950/40 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                      >
+                        ลบรูปภาพ
+                      </button>
+                    )}
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-semibold mt-0.5 leading-tight">
+                    รองรับไฟล์รูปภาพทั่วไป ระบบจะจำกัดความละเอียดและบีบอัดโดยอัตโนมัติไม่เกิน 150x150 พิกเซล
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* Student Name */}
