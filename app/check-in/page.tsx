@@ -452,7 +452,8 @@ export default function CheckInPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6 py-6 animate-fade-in">
+    <>
+      <div className="flex flex-col gap-6 py-6 animate-fade-in">
       {/* Title */}
       <div className="flex flex-col gap-1.5">
         <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
@@ -895,6 +896,7 @@ export default function CheckInPage() {
           </div>
         </div>
       </div>
+      </div>
 
       {/* Glassmorphism Health Screening Modal */}
       {showHealthModal && healthStudent && (
@@ -1061,6 +1063,6 @@ export default function CheckInPage() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

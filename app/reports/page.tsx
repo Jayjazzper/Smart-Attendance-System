@@ -1098,9 +1098,11 @@ export default function ReportsPage() {
         </div>
       )}
 
+      </div>
+
       {/* Manual Entry Modal Overlay */}
       {showManualModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in no-print">
           <div className="w-full max-w-md rounded-2xl border border-slate-100 bg-white p-6 shadow-xl flex flex-col gap-4">
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900">บันทึกข้อมูลเวลาเข้าเรียน/ลานักเรียน</h3>
@@ -1203,7 +1205,6 @@ export default function ReportsPage() {
           </div>
         </div>
       )}
-    </div>
 
     {/* Print Layout (Only visible when printing) */}
     <div className="hidden print-only-container">

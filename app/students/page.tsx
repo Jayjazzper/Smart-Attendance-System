@@ -338,6 +338,7 @@ export default function StudentsPage() {
           </div>
         )}
       </div>
+      </div>
 
       {/* Delete Confirmation Modal overlay */}
       {showDeleteConfirm && (
@@ -922,7 +923,6 @@ export default function StudentsPage() {
           </div>
         </div>
       )}
-      </div>
     </AdminGuard>
   );
 }

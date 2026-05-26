@@ -825,6 +825,7 @@ export default function DashboardPage() {
           </div>
         </>
       )}
+      </div>
 
       {/* Confirmation Modal overlay (simulating Database Wiping for right to be forgotten presentation) */}
       {showResetConfirm && (
@@ -876,7 +877,6 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
-    </div>
     </AdminGuard>
   );
 }
