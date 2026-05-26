@@ -607,8 +607,8 @@ export default function StudentsPage() {
 
       {/* Visual Attendance Calendar Modal */}
       {selectedStudentForCalendar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-xl rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xl flex flex-col gap-4 text-slate-900 dark:text-slate-100">
+        <div className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-slate-900/60 backdrop-blur-sm overflow-y-auto animate-fade-in">
+          <div className="my-auto w-full max-w-xl rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-xl flex flex-col gap-4 text-slate-900 dark:text-slate-100">
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <div className="flex flex-col text-left">
