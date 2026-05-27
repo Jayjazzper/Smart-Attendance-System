@@ -784,6 +784,7 @@ function ensureDefaultAdmin(settings: SystemSettings): { settings: SystemSetting
 
 export async function getSettings(): Promise<SystemSettings> {
   let rawSettings: SystemSettings | null = null;
+  let isFallback = false;
   
   // 1. Try Google Sheets Web App if active
   if (isGoogleSheetsActive()) {
@@ -807,11 +808,15 @@ export async function getSettings(): Promise<SystemSettings> {
       }
     } catch (e) {
       console.warn('Fallback to local JSON storage for getSettings due to API error:', e);
+      isFallback = true;
     }
   }
 
   // 2. Fallback to local files
   if (!rawSettings) {
+    if (isGoogleSheetsActive()) {
+      isFallback = true;
+    }
     const release = await dbMutex.acquire();
     try {
       await ensureDbExists();
@@ -866,7 +871,7 @@ export async function getSettings(): Promise<SystemSettings> {
 
   // Ensure default admin exists
   const { settings: finalSettings, changed } = ensureDefaultAdmin(rawSettings);
-  if (changed) {
+  if (changed && !isFallback) {
     saveSettings(finalSettings).catch(err => console.error("Failed to auto-save default admin:", err));
   }
 

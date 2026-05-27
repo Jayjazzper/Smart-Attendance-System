@@ -82,7 +82,24 @@ export async function POST(req: NextRequest) {
     }
 
     // Otherwise, it's a settings save request
-    const success = await saveSettings(body);
+    const currentSettings = await getSettings();
+    const updatedSettings = {
+      ...currentSettings,
+      classrooms: body.classrooms !== undefined ? body.classrooms : currentSettings.classrooms,
+      lineChannelAccessToken: body.lineChannelAccessToken !== undefined ? body.lineChannelAccessToken : currentSettings.lineChannelAccessToken,
+      teacherPasscode: body.teacherPasscode !== undefined ? body.teacherPasscode : currentSettings.teacherPasscode,
+      adminPasscode: body.adminPasscode !== undefined ? body.adminPasscode : currentSettings.adminPasscode,
+      schoolName: body.schoolName !== undefined ? body.schoolName : currentSettings.schoolName,
+      schoolDistrict: body.schoolDistrict !== undefined ? body.schoolDistrict : currentSettings.schoolDistrict,
+      schoolLogo: body.schoolLogo !== undefined ? body.schoolLogo : currentSettings.schoolLogo,
+      enableAutoSummary: body.enableAutoSummary !== undefined ? body.enableAutoSummary : currentSettings.enableAutoSummary,
+      summaryTime: body.summaryTime !== undefined ? body.summaryTime : currentSettings.summaryTime,
+      // Always preserve teachers and last summary dates from DB to prevent accidental wipes
+      teachers: currentSettings.teachers,
+      lastSummarySentDate: currentSettings.lastSummarySentDate
+    };
+
+    const success = await saveSettings(updatedSettings);
     if (success) {
       return NextResponse.json({ success: true, message: "บันทึกการตั้งค่าสำเร็จ" });
     } else {

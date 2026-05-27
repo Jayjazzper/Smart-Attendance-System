@@ -7,10 +7,21 @@ import { Teacher } from "@/lib/types";
 // Helper to verify admin role
 async function isAdmin(): Promise<boolean> {
   const cookieStore = await cookies();
+  
+  // 1. Check admin_authorized cookie (passcode validation)
+  const adminAuthorized = cookieStore.get("admin_authorized")?.value;
+  if (adminAuthorized === "true") {
+    return true;
+  }
+
+  // 2. Check teacher_session cookie
   const token = cookieStore.get("teacher_session")?.value;
-  if (!token) return false;
-  const user = decryptSession(token);
-  return user && user.role === "admin";
+  if (token) {
+    const user = decryptSession(token);
+    return user && user.role === "admin";
+  }
+
+  return false;
 }
 
 export async function GET() {
