@@ -1042,10 +1042,21 @@ export async function updateLeaveRequestStatus(
   id: string,
   status: 'approved' | 'rejected'
 ): Promise<boolean> {
+  let remoteLeaves: LeaveRequest[] | null = null;
+
   // 1. Try Google Sheets if active
   if (isGoogleSheetsActive()) {
     try {
-      await callGoogleScript('updateLeaveStatus', { id, status });
+      const updateRes = await callGoogleScript('updateLeaveStatus', { id, status });
+      if (updateRes && updateRes.success) {
+        // Fetch latest leaves from Google Sheets to sync local cache
+        const res = await callGoogleScript('getLeaves');
+        if (res && res.success && res.leaves) {
+          remoteLeaves = res.leaves;
+        }
+      } else {
+        return false; // Google Sheets update failed
+      }
     } catch (e) {
       console.warn('Failed to sync leave status update to Google Sheets:', e);
     }
@@ -1055,11 +1066,31 @@ export async function updateLeaveRequestStatus(
   const release = await dbMutex.acquire();
   try {
     await ensureDbExists();
-    const data = await fs.readFile(LEAVES_FILE, 'utf-8');
-    const parsed = JSON.parse(data);
-    const leaves: LeaveRequest[] = parsed.leaves || [];
+    
+    let leaves: LeaveRequest[] = [];
+    if (remoteLeaves) {
+      leaves = remoteLeaves;
+      await fs.writeFile(LEAVES_FILE, JSON.stringify({ leaves }, null, 2));
+    } else {
+      const data = await fs.readFile(LEAVES_FILE, 'utf-8');
+      const parsed = JSON.parse(data);
+      leaves = parsed.leaves || [];
+    }
 
-    const index = leaves.findIndex((l) => l.id === id);
+    let index = leaves.findIndex((l) => l.id === id);
+    
+    // If still not found, search Remote one more time if we hadn't already
+    if (index === -1 && !remoteLeaves && isGoogleSheetsActive()) {
+      try {
+        const res = await callGoogleScript('getLeaves');
+        if (res && res.success && res.leaves) {
+          leaves = res.leaves;
+          await fs.writeFile(LEAVES_FILE, JSON.stringify({ leaves }, null, 2));
+          index = leaves.findIndex((l) => l.id === id);
+        }
+      } catch (e) {}
+    }
+
     if (index === -1) return false;
 
     leaves[index].status = status;

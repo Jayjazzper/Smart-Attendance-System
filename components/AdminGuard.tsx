@@ -128,10 +128,14 @@ export default function AdminGuard({ children, allowTeacher = false }: AdminGuar
           </div>
           <div className="flex flex-col gap-1">
             <h2 className="text-lg font-black text-slate-900 dark:text-white">
-              พื้นที่เฉพาะผู้ดูแลระบบ (Admin Area)
+              {allowTeacher 
+                ? "พื้นที่ตรวจสอบสิทธิ์ครูประจำชั้นและผู้ดูแล" 
+                : "พื้นที่เฉพาะผู้ดูแลระบบ (Admin Area)"}
             </h2>
             <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 leading-relaxed px-4">
-              หน้านี้มีข้อมูลส่วนบุคคลของเด็กนักเรียนและโทเคนระบบ กรุณากรอกชื่อผู้ใช้และรหัสผ่านเพื่อเข้าใช้งาน
+              {allowTeacher 
+                ? "กรุณากรอกชื่อผู้ใช้งานและรหัสผ่านบัญชีคุณครูประจำชั้นหรือผู้ดูแลระบบเพื่อยืนยันสิทธิ์เข้าใช้งาน" 
+                : "หน้านี้มีข้อมูลส่วนบุคคลของเด็กนักเรียนและโทเคนระบบ กรุณากรอกชื่อผู้ใช้และรหัสผ่านแอดมินเพื่อเข้าใช้งาน"}
             </p>
           </div>
         </div>
@@ -142,7 +146,9 @@ export default function AdminGuard({ children, allowTeacher = false }: AdminGuar
             <label className="text-xs font-bold text-slate-700 dark:text-slate-300">ชื่อผู้ใช้งาน (Username)</label>
             <input
               type="text"
-              placeholder="ป้อนชื่อผู้ใช้งานแอดมิน..."
+              placeholder={allowTeacher 
+                ? "ป้อนชื่อผู้ใช้งานบัญชีครูหรือแอดมิน..." 
+                : "ป้อนชื่อผู้ใช้งานแอดมิน..."}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-350 placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
