@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 
 interface Student {
   classroom?: string;
@@ -446,6 +447,16 @@ export default function AccessControlSelector() {
                 >
                   {loading ? "กำลังตรวจสอบ..." : "ยืนยันสิทธิ์เข้าใช้งาน"}
                 </button>
+
+                <div className="text-center mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <Link
+                    href="/register/teacher"
+                    onClick={handleClose}
+                    className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    ยังไม่มีบัญชีครูประจำชั้น? สมัครใช้งานที่นี่
+                  </Link>
+                </div>
               </form>
             )}
           </div>
