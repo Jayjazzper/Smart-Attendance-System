@@ -5,20 +5,33 @@ import { decryptSession } from "@/lib/auth";
 export async function GET() {
   try {
     const cookieStore = await cookies();
+    
+    // 1. Check teacher session (username/password login)
     const token = cookieStore.get("teacher_session")?.value;
-    
-    if (!token) {
-      return NextResponse.json({ loggedIn: false }, { status: 200 });
+    if (token) {
+      const user = decryptSession(token);
+      if (user) {
+        return NextResponse.json({ loggedIn: true, user });
+      } else {
+        cookieStore.delete("teacher_session");
+      }
     }
     
-    const user = decryptSession(token);
-    if (!user) {
-      // Clear invalid/expired cookie
-      cookieStore.delete("teacher_session");
-      return NextResponse.json({ loggedIn: false }, { status: 200 });
+    // 2. Check admin passcode verification cookie
+    const adminAuthorized = cookieStore.get("admin_authorized")?.value;
+    if (adminAuthorized === "true") {
+      return NextResponse.json({
+        loggedIn: true,
+        user: {
+          username: "admin",
+          name: "ผู้ดูแลระบบกลาง",
+          role: "admin",
+          classrooms: []
+        }
+      });
     }
     
-    return NextResponse.json({ loggedIn: true, user });
+    return NextResponse.json({ loggedIn: false }, { status: 200 });
   } catch (error) {
     console.error("Auth Me API error:", error);
     return NextResponse.json(
