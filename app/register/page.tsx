@@ -34,7 +34,7 @@ const GRADE_LEVELS = {
   ],
 };
 
-const ROOMS = ["ห้อง 1", "ห้อง 2", "ห้อง 3", "ห้อง 4", "ห้อง 5"];
+const ROOMS = ["ห้อง 1", "ห้อง 2", "ห้อง 3", "ห้อง 4", "ห้อง 5", "ห้อง 6", "ห้อง 7", "ห้อง 8", "ห้อง 9", "ห้อง 10"];
 
 function getAbbreviatedClassroom(grade: string, room: string): string {
   const roomNumber = room.replace("ห้อง ", "");
