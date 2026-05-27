@@ -450,7 +450,7 @@ export default function StudentsPage() {
                 <div className="absolute -bottom-10 -right-10 w-24 h-24 rounded-full bg-indigo-400/10 blur-xl pointer-events-none"></div>
 
                 {/* Emergency & Medical Info Badge (Functional - replaces gold chip) */}
-                <div className="absolute top-[88px] right-4 flex flex-col items-end gap-1.5">
+                <div className="absolute top-[88px] right-4 flex flex-col items-end gap-1.5 z-20">
                   {selectedStudentForCard.bloodGroup || selectedStudentForCard.emergencyPhone || selectedStudentForCard.medicalAlert ? (
                     <>
                       {/* Blood Group Pill */}
@@ -461,14 +461,18 @@ export default function StudentsPage() {
                         </div>
                       )}
 
-                      {/* Emergency Phone Pill */}
+                      {/* Emergency Phone Pill (Click to Call) */}
                       {selectedStudentForCard.emergencyPhone && (
-                        <div className="flex items-center gap-1 bg-slate-50 border border-slate-200/80 rounded-md px-1.5 py-0.5 shadow-sm">
+                        <a 
+                          href={`tel:${selectedStudentForCard.emergencyPhone.replace(/[^\d]/g, '')}`}
+                          className="flex items-center gap-1 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 rounded-md px-1.5 py-0.5 shadow-sm transition-colors cursor-pointer no-underline"
+                          title="คลิกเพื่อโทรหาผู้ปกครอง"
+                        >
                           <span className="text-[8px] text-slate-500 leading-none">📞</span>
-                          <span className="text-[7.5px] font-bold text-slate-700 font-mono leading-none">
+                          <span className="text-[7.5px] font-bold text-slate-700 font-mono leading-none hover:text-blue-600">
                             {selectedStudentForCard.emergencyPhone}
                           </span>
-                        </div>
+                        </a>
                       )}
 
                       {/* Medical Alert Pill */}
@@ -482,16 +486,17 @@ export default function StudentsPage() {
                       )}
                     </>
                   ) : (
-                    /* Default placeholder graphic */
-                    <div className="w-8 h-7 rounded-md bg-gradient-to-tr from-amber-300 via-yellow-400 to-amber-500 border border-amber-600/20 p-1 flex flex-col justify-between shadow-sm opacity-60 pointer-events-none">
-                      <div className="h-[1px] bg-amber-800/25 w-full"></div>
-                      <div className="flex justify-between h-full py-0.5">
-                        <div className="w-[1px] bg-amber-800/25 h-full"></div>
-                        <div className="w-[1px] bg-amber-800/25 h-full"></div>
-                        <div className="w-[1px] bg-amber-800/25 h-full"></div>
-                      </div>
-                      <div className="h-[1px] bg-amber-800/25 w-full"></div>
-                    </div>
+                    /* Clickable button to add emergency info (Hidden on print) */
+                    <Link
+                      href={`/students/${selectedStudentForCard.id}`}
+                      className="no-print flex flex-col items-center justify-center w-20 h-10 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200/60 shadow-sm transition-colors text-red-650 cursor-pointer p-1"
+                      title="ไม่มีข้อมูลฉุกเฉิน คลิกเพื่อแก้ไขประวัตินักเรียนและเพิ่มข้อมูล"
+                    >
+                      <span className="text-[14px] leading-none mb-0.5">🏥</span>
+                      <span className="text-[7.5px] font-extrabold text-red-700 leading-none tracking-tighter text-center">
+                        + เพิ่มข้อมูลฉุกเฉิน
+                      </span>
+                    </Link>
                   )}
                 </div>
 
