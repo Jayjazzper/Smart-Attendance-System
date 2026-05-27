@@ -1,12 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSettings, saveSettings } from "@/lib/db";
+import { isRequestAuthorized } from "@/lib/auth";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
     const settings = await getSettings();
-    return NextResponse.json(settings);
+    const authorized = await isRequestAuthorized();
+
+    if (authorized) {
+      return NextResponse.json(settings);
+    }
+
+    // Sanitize settings to prevent credential leakage
+    const sanitizedClassrooms: any = {};
+    if (settings.classrooms) {
+      Object.keys(settings.classrooms).forEach((cls) => {
+        sanitizedClassrooms[cls] = {}; // Strip classroom-specific LINE tokens but keep class keys
+      });
+    }
+
+    const sanitizedSettings = {
+      schoolName: settings.schoolName || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)",
+      schoolDistrict: settings.schoolDistrict || "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1",
+      schoolLogo: settings.schoolLogo || "",
+      classrooms: sanitizedClassrooms,
+      enableAutoSummary: settings.enableAutoSummary ?? false,
+      summaryTime: settings.summaryTime || "08:30"
+    };
+
+    return NextResponse.json(sanitizedSettings);
   } catch (error) {
     console.error("GET /api/settings error:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
@@ -15,6 +39,14 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const authorized = await isRequestAuthorized();
+    if (!authorized) {
+      return NextResponse.json(
+        { error: "ไม่ได้รับอนุญาตสำหรับการดำเนินการนี้ (Admin only)" },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     
     // If it's a test notification request

@@ -43,6 +43,16 @@ export async function POST(req: NextRequest) {
     let count = 0;
     const createdLogs = [];
 
+    // Construct the timestamp for the target date at 08:30:00 (school homeroom deadline)
+    const logTimestamp = new Date(
+      targetDate.getFullYear(),
+      targetDate.getMonth(),
+      targetDate.getDate(),
+      8,
+      30,
+      0
+    ).toISOString();
+
     // 3. For each missing student, record as "absent" (ขาด)
     for (const student of students) {
       if (!checkedInStudentIds.has(student.id)) {
@@ -54,6 +64,7 @@ export async function POST(req: NextRequest) {
           confidence: 100,
           classroom: student.classroom || "",
           status: "absent",
+          timestamp: logTimestamp,
         });
         if (record) {
           // If in Google Sheets mode, the saveAttendance returns record with new id & timestamp.

@@ -1,11 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStudents, saveAllStudents } from "@/lib/db";
 import { Student } from "@/lib/types";
+import { isRequestAuthorized } from "@/lib/auth";
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
+    const authorized = await isRequestAuthorized();
+    if (!authorized) {
+      return NextResponse.json(
+        { error: "ไม่ได้รับอนุญาตสำหรับการดำเนินการนี้ (Admin only)" },
+        { status: 403 }
+      );
+    }
+
     const students = await getStudents();
     return NextResponse.json({ students });
   } catch (error) {
@@ -16,6 +25,14 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const authorized = await isRequestAuthorized();
+    if (!authorized) {
+      return NextResponse.json(
+        { error: "ไม่ได้รับอนุญาตสำหรับการดำเนินการนี้ (Admin only)" },
+        { status: 403 }
+      );
+    }
+
     const body = await req.json();
     const { students, overwrite } = body;
 
@@ -66,3 +83,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
+

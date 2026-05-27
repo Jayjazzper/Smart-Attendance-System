@@ -1,7 +1,9 @@
 import crypto from 'crypto';
+import { cookies } from 'next/headers';
 
 // Use environment secret or a secure fallback (in production, USER should set SESSION_SECRET)
 const SESSION_SECRET = process.env.SESSION_SECRET || "smart-attendance-system-secret-key-32chars-minimum";
+
 
 /**
  * Hash a password using Node.js pbkdf2Sync (zero dependency)
@@ -62,3 +64,31 @@ export function decryptSession(token: string): any | null {
     return null;
   }
 }
+
+/**
+ * Check if the current request is authorized as admin (via session or passcode authorization cookie)
+ */
+export async function isRequestAuthorized(): Promise<boolean> {
+  try {
+    const cookieStore = await cookies();
+    
+    // 1. Check if they have a valid admin session cookie
+    const teacherSession = cookieStore.get("teacher_session")?.value;
+    if (teacherSession) {
+      const user = decryptSession(teacherSession);
+      if (user && user.role === "admin") {
+        return true;
+      }
+    }
+    
+    // 2. Check if they have a valid admin passcode verification cookie
+    const adminAuthorized = cookieStore.get("admin_authorized")?.value;
+    if (adminAuthorized === "true") {
+      return true;
+    }
+  } catch (e) {
+    console.error("isRequestAuthorized error:", e);
+  }
+  return false;
+}
+

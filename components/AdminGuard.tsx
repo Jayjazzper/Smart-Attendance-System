@@ -38,19 +38,18 @@ export default function AdminGuard({ children, allowTeacher = false }: AdminGuar
     setErrorMsg("");
 
     try {
-      const res = await fetch("/api/settings");
-      if (res.ok) {
-        const settings = await res.json();
-        const correctPasscode = settings.adminPasscode || "1234";
+      const res = await fetch("/api/auth/verify-passcode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ passcode, type: "admin" })
+      });
 
-        if (passcode === correctPasscode) {
-          localStorage.setItem("adminValidated", "true");
-          setIsValidated(true);
-        } else {
-          setErrorMsg("รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง");
-        }
+      if (res.ok) {
+        localStorage.setItem("adminValidated", "true");
+        setIsValidated(true);
       } else {
-        setErrorMsg("ไม่สามารถเชื่อมต่อระบบตั้งค่าได้");
+        const data = await res.json().catch(() => ({}));
+        setErrorMsg(data.error || "รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง");
       }
     } catch (err) {
       setErrorMsg("เกิดข้อผิดพลาดในการตรวจสอบรหัสผ่าน");
@@ -58,6 +57,7 @@ export default function AdminGuard({ children, allowTeacher = false }: AdminGuar
       setLoading(false);
     }
   };
+
 
   // While checking validation status
   if (isValidated === null) {
