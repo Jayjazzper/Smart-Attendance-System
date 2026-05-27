@@ -4,6 +4,14 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(30000); // wait up to 30s
+  } catch (lockError) {
+    return ContentService.createTextOutput(JSON.stringify({ success: false, error: "Server busy. Please try again." }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+  
   var result = { success: false };
   try {
     var postData = JSON.parse(e.postData.contents);
@@ -214,6 +222,26 @@ function doPost(e) {
             }
           }
         }
+        
+        // Also update matching records in leaves sheet dynamically
+        var leavesSheet = ss.getSheetByName("leaves");
+        if (leavesSheet) {
+          var leavesHeaders = leavesSheet.getRange(1, 1, 1, leavesSheet.getLastColumn() || 10).getValues()[0];
+          var idxLeavesStudentId = leavesHeaders.indexOf("studentId");
+          var idxLeavesName = leavesHeaders.indexOf("studentName");
+          var idxLeavesClassroom = leavesHeaders.indexOf("classroom");
+          
+          if (idxLeavesStudentId !== -1) {
+            var leavesData = leavesSheet.getDataRange().getValues();
+            for (var k = 1; k < leavesData.length; k++) {
+              if (String(leavesData[k][idxLeavesStudentId]) === String(id)) {
+                if (idxLeavesName !== -1 && name !== undefined) leavesSheet.getRange(k + 1, idxLeavesName + 1).setValue(name);
+                if (idxLeavesClassroom !== -1 && classroom !== undefined) leavesSheet.getRange(k + 1, idxLeavesClassroom + 1).setValue(classroom);
+              }
+            }
+          }
+        }
+        
         result = { success: true };
       } else {
         result = { success: false, error: "Student not found" };
@@ -238,6 +266,17 @@ function doPost(e) {
       for (var j = attData.length - 1; j >= 1; j--) {
         if (String(attData[j][1]) === String(id)) {
           attendanceSheet.deleteRow(j + 1);
+        }
+      }
+      
+      // Delete leave records (reverse loop so row shifting doesn't skip)
+      var leavesSheet = ss.getSheetByName("leaves");
+      if (leavesSheet) {
+        var leavesData = leavesSheet.getDataRange().getValues();
+        for (var k = leavesData.length - 1; k >= 1; k--) {
+          if (String(leavesData[k][1]) === String(id)) {
+            leavesSheet.deleteRow(k + 1);
+          }
         }
       }
       
@@ -481,6 +520,8 @@ function doPost(e) {
     
   } catch (error) {
     result.error = error.toString();
+  } finally {
+    lock.releaseLock();
   }
   
   return ContentService.createTextOutput(JSON.stringify(result))
