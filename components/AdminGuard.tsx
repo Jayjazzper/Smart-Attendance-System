@@ -16,6 +16,66 @@ export default function AdminGuard({ children, allowTeacher = false }: AdminGuar
   const [loading, setLoading] = useState(false);
   const [showPasscode, setShowPasscode] = useState(false);
 
+  const [isRecovering, setIsRecovering] = useState(false);
+  const [recoveryRole, setRecoveryRole] = useState<"admin" | "teacher">("teacher");
+  const [recoveryEmail, setRecoveryEmail] = useState("");
+  const [recoveryPasscode, setRecoveryPasscode] = useState("");
+  const [recoveryUsername, setRecoveryUsername] = useState("");
+  const [recoveryPassword, setRecoveryPassword] = useState("");
+  const [recoveryErrorMsg, setRecoveryErrorMsg] = useState("");
+  const [recoverySuccessMsg, setRecoverySuccessMsg] = useState("");
+  const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
+  const [showRecoveryPasscode, setShowRecoveryPasscode] = useState(false);
+  const [recoveryLoading, setRecoveryLoading] = useState(false);
+
+  const handleRecoverySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recoveryEmail || !recoveryPasscode || !recoveryUsername || !recoveryPassword) {
+      setRecoveryErrorMsg("กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง");
+      return;
+    }
+
+    setRecoveryLoading(true);
+    setRecoveryErrorMsg("");
+    setRecoverySuccessMsg("");
+
+    try {
+      const res = await fetch("/api/auth/reset-account", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: recoveryEmail,
+          role: recoveryRole,
+          passcode: recoveryPasscode,
+          newUsername: recoveryUsername,
+          newPassword: recoveryPassword,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setRecoverySuccessMsg(data.message || "รีเซ็ตบัญชีสำเร็จ!");
+        setUsername(recoveryUsername);
+        setPassword("");
+        setRecoveryEmail("");
+        setRecoveryPasscode("");
+        setRecoveryUsername("");
+        setRecoveryPassword("");
+        setTimeout(() => {
+          setIsRecovering(false);
+          setRecoverySuccessMsg("");
+        }, 3000);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setRecoveryErrorMsg(data.error || "เกิดข้อผิดพลาดในการกู้คืนบัญชี");
+      }
+    } catch (err) {
+      setRecoveryErrorMsg("เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
+    } finally {
+      setRecoveryLoading(false);
+    }
+  };
+
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -105,6 +165,202 @@ export default function AdminGuard({ children, allowTeacher = false }: AdminGuar
     return <>{children}</>;
   }
 
+  if (isRecovering) {
+    return (
+      <div className="flex-1 flex items-center justify-center py-12 px-4">
+        <div className="w-full max-w-md rounded-3xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 shadow-xl flex flex-col gap-6 animate-scale-up">
+          {/* Recovery Header */}
+          <div className="flex flex-col items-center text-center gap-3">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-tr from-blue-500 to-indigo-500 text-white shadow-lg shadow-blue-500/25">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <path d="M8 11h8" />
+                <path d="M12 7v8" />
+              </svg>
+            </div>
+            <div className="flex flex-col gap-1">
+              <h2 className="text-lg font-black text-slate-900 dark:text-white">
+                กู้คืนบัญชีผู้ใช้งาน
+              </h2>
+              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 leading-relaxed px-4">
+                กรอกอีเมลที่ใช้ลงทะเบียนพร้อมรหัสพาสโค้ดของสถาบัน เพื่อรีเซ็ตชื่อผู้ใช้และตั้งรหัสผ่านใหม่
+              </p>
+            </div>
+          </div>
+
+          {/* Recovery Form */}
+          <form onSubmit={handleRecoverySubmit} className="flex flex-col gap-4">
+            {/* Role Selection */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">กลุ่มสิทธิ์ผู้ใช้งาน</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRecoveryRole("teacher")}
+                  className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                    recoveryRole === "teacher"
+                      ? "bg-blue-500 border-blue-500 text-white shadow-sm shadow-blue-500/20"
+                      : "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900"
+                  }`}
+                >
+                  ครูประจำชั้น
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecoveryRole("admin")}
+                  className={`py-2 px-3 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
+                    recoveryRole === "admin"
+                      ? "bg-blue-500 border-blue-500 text-white shadow-sm shadow-blue-500/20"
+                      : "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900"
+                  }`}
+                >
+                  ผู้ดูแลระบบ (Admin)
+                </button>
+              </div>
+            </div>
+
+            {/* Email Field */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">อีเมลที่ใช้ลงทะเบียน</label>
+              <input
+                type="email"
+                placeholder="example@school.mail"
+                value={recoveryEmail}
+                onChange={(e) => setRecoveryEmail(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
+                required
+              />
+            </div>
+
+            {/* Passcode Field */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                รหัสผ่านสถาบัน ({recoveryRole === "admin" ? "Admin Passcode" : "Teacher Passcode"})
+              </label>
+              <div className="relative flex items-center">
+                <input
+                  type={showRecoveryPasscode ? "text" : "password"}
+                  placeholder="ป้อนรหัสยืนยันสถาบัน..."
+                  value={recoveryPasscode}
+                  onChange={(e) => setRecoveryPasscode(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 pl-4 pr-10 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowRecoveryPasscode(!showRecoveryPasscode)}
+                  className="absolute right-3.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 cursor-pointer select-none"
+                  title={showRecoveryPasscode ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                >
+                  {showRecoveryPasscode ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* New Username Field */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">ชื่อผู้ใช้งานใหม่ (New Username)</label>
+              <input
+                type="text"
+                placeholder="ตั้งชื่อผู้ใช้งานใหม่..."
+                value={recoveryUsername}
+                onChange={(e) => setRecoveryUsername(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
+                required
+              />
+            </div>
+
+            {/* New Password Field */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300">รหัสผ่านใหม่ (New Password)</label>
+              <div className="relative flex items-center">
+                <input
+                  type={showRecoveryPassword ? "text" : "password"}
+                  placeholder="ตั้งรหัสผ่านใหม่..."
+                  value={recoveryPassword}
+                  onChange={(e) => setRecoveryPassword(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 pl-4 pr-10 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowRecoveryPassword(!showRecoveryPassword)}
+                  className="absolute right-3.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 cursor-pointer select-none"
+                  title={showRecoveryPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                >
+                  {showRecoveryPassword ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {recoveryErrorMsg && (
+              <p className="text-xs font-bold text-red-600 text-center animate-shake">
+                ⚠️ {recoveryErrorMsg}
+              </p>
+            )}
+
+            {recoverySuccessMsg && (
+              <p className="text-xs font-bold text-emerald-600 text-center animate-pulse">
+                ✅ {recoverySuccessMsg}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={recoveryLoading}
+              className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-3 text-xs font-bold text-white shadow-sm shadow-blue-500/20 hover:bg-blue-700 disabled:bg-slate-300 transition-colors cursor-pointer h-10.5"
+            >
+              {recoveryLoading ? "กำลังดำเนินการกู้คืน..." : "บันทึกและกู้คืนบัญชี"}
+            </button>
+          </form>
+
+          {/* Back to Login */}
+          <div className="border-t border-slate-50 dark:border-slate-800 pt-4 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setIsRecovering(false);
+                setRecoveryErrorMsg("");
+                setRecoverySuccessMsg("");
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+              >
+                <line x1="19" y1="12" x2="5" y2="12" />
+                <polyline points="12 19 5 12 12 5" />
+              </svg>
+              <span>ย้อนกลับไปหน้าเข้าสู่ระบบ</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // If not validated, render the Glassmorphism Lock Screen
   return (
     <div className="flex-1 flex items-center justify-center py-12 px-4">
@@ -179,6 +435,20 @@ export default function AdminGuard({ children, allowTeacher = false }: AdminGuar
                 )}
               </button>
             </div>
+          </div>
+
+          <div className="flex justify-end -mt-1">
+            <button
+              type="button"
+              onClick={() => {
+                setIsRecovering(true);
+                setErrorMsg("");
+                setRecoveryRole(allowTeacher ? "teacher" : "admin");
+              }}
+              className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer select-none"
+            >
+              ลืมชื่อผู้ใช้หรือรหัสผ่าน?
+            </button>
           </div>
 
           {errorMsg && (
