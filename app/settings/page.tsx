@@ -1473,8 +1473,14 @@ export default function SettingsPage() {
             {/* Logout Admin button to manually clear session */}
             <div className="border-t border-slate-100 pt-4 flex justify-end">
               <button
-                onClick={() => {
+                onClick={async () => {
+                  try {
+                    await fetch("/api/auth/logout", { method: "POST" });
+                  } catch (e) {
+                    console.error("Error logging out:", e);
+                  }
                   localStorage.removeItem("adminValidated");
+                  localStorage.removeItem("teacherSession");
                   window.location.reload();
                 }}
                 className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-red-50 border border-red-100 px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-100 hover:text-red-700 transition-colors shadow-sm cursor-pointer"

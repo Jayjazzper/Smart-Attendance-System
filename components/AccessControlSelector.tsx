@@ -194,6 +194,7 @@ export default function AccessControlSelector() {
       const res = await fetch("/api/auth/logout", { method: "POST" });
       if (res.ok) {
         localStorage.removeItem("teacherSession");
+        localStorage.removeItem("adminValidated");
         setSession(null);
         setUser(null);
         setIsOpen(false);
