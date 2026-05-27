@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     if (userIndex === -1) {
       return NextResponse.json(
         { 
-          error: `ไม่พบประพัติการลงทะเบียนสำหรับอีเมลนี้ในกลุ่มผู้ใช้ (${
+          error: `ไม่พบประวัติการลงทะเบียนสำหรับอีเมลนี้ในกลุ่มผู้ใช้ (${
             role === "admin" ? "ผู้ดูแลระบบ" : "ครูประจำชั้น"
           })` 
         },
