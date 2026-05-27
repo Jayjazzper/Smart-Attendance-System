@@ -98,7 +98,8 @@ function doPost(e) {
             email: idxEmail !== -1 ? String(row[idxEmail]) : "",
             faceDescriptor: faceDesc,
             consentGiven: idxConsentGiven !== -1 ? (String(row[idxConsentGiven]).toLowerCase() === "true" || row[idxConsentGiven] === true) : true,
-            registeredAt: idxRegisteredAt !== -1 ? String(row[idxRegisteredAt]) : "",
+            registeredAt: idxRegisteredAt !== -1 ? formatDateSafe(row[idxRegisteredAt]) : "",
+
             classroom: idxClassroom !== -1 ? String(row[idxClassroom]) : "",
             level: idxLevel !== -1 ? String(row[idxLevel]) : "",
             parentLineId: idxParentLineId !== -1 ? String(row[idxParentLineId]) : "",
@@ -267,7 +268,8 @@ function doPost(e) {
             studentId: idxStudentId !== -1 ? String(row[idxStudentId]) : "",
             studentName: idxStudentName !== -1 ? String(row[idxStudentName]) : "",
             studentEmail: idxStudentEmail !== -1 ? String(row[idxStudentEmail]) : "",
-            timestamp: idxTimestamp !== -1 ? String(row[idxTimestamp]) : "",
+            timestamp: idxTimestamp !== -1 ? formatDateSafe(row[idxTimestamp]) : "",
+
             confidence: idxConfidence !== -1 ? Number(row[idxConfidence]) : 100,
             classroom: idxClassroom !== -1 ? String(row[idxClassroom]) : "",
             status: idxStatus !== -1 ? String(row[idxStatus]) : "present",
@@ -328,12 +330,12 @@ function doPost(e) {
             studentId: idxStudentId !== -1 ? String(row[idxStudentId]) : "",
             studentName: idxStudentName !== -1 ? String(row[idxStudentName]) : "",
             classroom: idxClassroom !== -1 ? String(row[idxClassroom]) : "",
-            startDate: idxStartDate !== -1 ? String(row[idxStartDate]) : "",
-            endDate: idxEndDate !== -1 ? String(row[idxEndDate]) : "",
+            startDate: idxStartDate !== -1 ? formatDateSafe(row[idxStartDate]) : "",
+            endDate: idxEndDate !== -1 ? formatDateSafe(row[idxEndDate]) : "",
             type: idxType !== -1 ? String(row[idxType]) : "personal",
             reason: idxReason !== -1 ? String(row[idxReason]) : "",
             status: idxStatus !== -1 ? String(row[idxStatus]) : "pending",
-            submittedAt: idxSubmittedAt !== -1 ? String(row[idxSubmittedAt]) : ""
+            submittedAt: idxSubmittedAt !== -1 ? formatDateSafe(row[idxSubmittedAt]) : ""
           });
         }
       }
@@ -483,4 +485,16 @@ function doPost(e) {
   
   return ContentService.createTextOutput(JSON.stringify(result))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function formatDateSafe(val) {
+  if (!val) return "";
+  if (val instanceof Date) {
+    try {
+      return val.toISOString();
+    } catch(e) {
+      return "";
+    }
+  }
+  return String(val);
 }
