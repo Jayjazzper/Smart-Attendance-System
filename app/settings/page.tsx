@@ -157,6 +157,11 @@ export default function SettingsPage() {
   const [teacherStatusMsg, setTeacherStatusMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
   const [customClass, setCustomClass] = useState("");
 
+  // Password visibility states
+  const [showTeacherPassword, setShowTeacherPassword] = useState(false);
+  const [showTeacherPasscodeConfig, setShowTeacherPasscodeConfig] = useState(false);
+  const [showAdminPasscodeConfig, setShowAdminPasscodeConfig] = useState(false);
+
   const fetchTeachers = async () => {
     setIsTeachersLoading(true);
     try {
@@ -194,6 +199,7 @@ export default function SettingsPage() {
           setTeacherStatusMsg({ text: "✓ แก้ไขข้อมูลคุณครูสำเร็จ", type: "success" });
           setEditingTeacher(null);
           setTeacherForm({ username: "", password: "", name: "", email: "", role: "teacher", classrooms: [] });
+          setShowTeacherPassword(false);
           fetchTeachers();
         } else {
           const data = await res.json();
@@ -216,6 +222,7 @@ export default function SettingsPage() {
         if (res.ok) {
           setTeacherStatusMsg({ text: "✓ สร้างบัญชีคุณครูสำเร็จ", type: "success" });
           setTeacherForm({ username: "", password: "", name: "", email: "", role: "teacher", classrooms: [] });
+          setShowTeacherPassword(false);
           fetchTeachers();
         } else {
           const data = await res.json();
@@ -1160,6 +1167,7 @@ export default function SettingsPage() {
                                 classrooms: t.classrooms || []
                               });
                               setTeacherStatusMsg(null);
+                              setShowTeacherPassword(false);
                             }}
                             className="p-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 hover:text-blue-600 dark:hover:text-blue-400 text-slate-500 transition-colors cursor-pointer"
                             title="แก้ไขบัญชี"
@@ -1205,14 +1213,28 @@ export default function SettingsPage() {
                   <label className="text-[10px] font-bold text-slate-600 dark:text-slate-400">
                     รหัสผ่าน (Password) {editingTeacher && "(ปล่อยว่างไว้หากไม่ต้องการเปลี่ยน)"}
                   </label>
-                  <input
-                    type="password"
-                    placeholder={editingTeacher ? "เปลี่ยนรหัสผ่านใหม่..." : "ระบุรหัสผ่าน..."}
-                    value={teacherForm.password}
-                    onChange={(e) => setTeacherForm(prev => ({ ...prev, password: e.target.value }))}
-                    className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-350 focus:outline-none focus:border-blue-500"
-                    required={!editingTeacher}
-                  />
+                  <div className="relative flex items-center">
+                    <input
+                      type={showTeacherPassword ? "text" : "password"}
+                      placeholder={editingTeacher ? "เปลี่ยนรหัสผ่านใหม่..." : "ระบุรหัสผ่าน..."}
+                      value={teacherForm.password}
+                      onChange={(e) => setTeacherForm(prev => ({ ...prev, password: e.target.value }))}
+                      className="w-full rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 pl-3 pr-9 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-350 focus:outline-none focus:border-blue-500"
+                      required={!editingTeacher}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowTeacherPassword(!showTeacherPassword)}
+                      className="absolute right-2.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 cursor-pointer select-none"
+                      title={showTeacherPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                    >
+                      {showTeacherPassword ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Full Name */}
@@ -1316,6 +1338,7 @@ export default function SettingsPage() {
                         setEditingTeacher(null);
                         setTeacherForm({ username: "", password: "", name: "", email: "", role: "teacher", classrooms: [] });
                         setTeacherStatusMsg(null);
+                        setShowTeacherPassword(false);
                       }}
                       className="flex-1 inline-flex items-center justify-center rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-3 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 transition-all cursor-pointer h-9.5"
                     >
@@ -1334,34 +1357,48 @@ export default function SettingsPage() {
           </div>
 
           {/* System Passcodes card */}
-          <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm flex flex-col gap-6">
+          <div className="rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm flex flex-col gap-6 text-slate-900 dark:text-slate-100">
             <div>
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-1.5">
+              <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                 กำหนดรหัสผ่านความปลอดภัยระบบ (System Passcodes)
               </h3>
-              <p className="text-[10px] font-semibold text-slate-500 mt-0.5">
+              <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mt-0.5">
                 ตั้งค่าและเปลี่ยนรหัสผ่านสำหรับการเข้าใช้งานในระดับห้องเรียน และการเข้าถึงข้อมูลระบบของผู้ดูแลระบบ
               </p>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
               {/* Teacher Passcode */}
-              <div className="rounded-xl border border-slate-100 p-4 bg-slate-50/50 flex flex-col gap-4">
+              <div className="rounded-xl border border-slate-100 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-950/20 flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-800">รหัสผ่านสำหรับครูประจำชั้น (Teacher Passcode)</span>
-                  <p className="text-[10px] font-semibold text-slate-400 leading-relaxed">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">รหัสผ่านสำหรับครูประจำชั้น (Teacher Passcode)</span>
+                  <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 leading-relaxed">
                     ใช้สำหรับล็อกการใช้งานกล้องสแกนและสลับสิทธิ์การเข้าถึงข้อมูลเฉพาะห้องเรียนตนเอง
                   </p>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <input
-                    type="text"
-                    placeholder="ป้อนรหัสผ่านครูประจำชั้น (เช่น 1234)..."
-                    value={settings.teacherPasscode || ""}
-                    onChange={(e) => handlePasscodeChange(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:outline-none transition-colors"
-                  />
+                  <div className="relative flex items-center">
+                    <input
+                      type={showTeacherPasscodeConfig ? "text" : "password"}
+                      placeholder="ป้อนรหัสผ่านครูประจำชั้น (เช่น 1234)..."
+                      value={settings.teacherPasscode || ""}
+                      onChange={(e) => handlePasscodeChange(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 pl-4 pr-10 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowTeacherPasscodeConfig(!showTeacherPasscodeConfig)}
+                      className="absolute right-3.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 cursor-pointer select-none"
+                      title={showTeacherPasscodeConfig ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                    >
+                      {showTeacherPasscodeConfig ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      )}
+                    </button>
+                  </div>
                   <button
                     onClick={handleSavePasscode}
                     disabled={isSavingPasscode}
@@ -1374,8 +1411,8 @@ export default function SettingsPage() {
                 {passcodeStatusMessage && (
                   <div className={`rounded-xl px-4 py-2.5 text-center text-xs font-bold border animate-fade-in ${
                     passcodeStatusMessage.type === "success"
-                      ? "bg-emerald-50 border-emerald-100 text-emerald-800"
-                      : "bg-red-50 border-red-100 text-red-800"
+                      ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-400"
+                      : "bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900/50 text-red-800 dark:text-red-400"
                   }`}>
                     {passcodeStatusMessage.text}
                   </div>
@@ -1383,21 +1420,35 @@ export default function SettingsPage() {
               </div>
 
               {/* Admin Passcode */}
-              <div className="rounded-xl border border-slate-100 p-4 bg-slate-50/50 flex flex-col gap-4">
+              <div className="rounded-xl border border-slate-100 dark:border-slate-800 p-4 bg-slate-50/50 dark:bg-slate-950/20 flex flex-col gap-4">
                 <div className="flex flex-col gap-1">
-                  <span className="text-xs font-bold text-slate-800">รหัสผ่านสำหรับผู้ดูแลระบบ (Admin Passcode)</span>
-                  <p className="text-[10px] font-semibold text-slate-400 leading-relaxed">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-200">รหัสผ่านสำหรับผู้ดูแลระบบ (Admin Passcode)</span>
+                  <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 leading-relaxed">
                     ใช้สำหรับเข้าถึงหน้าตั้งค่าระบบ หน้าจัดการข้อมูลนักเรียน และแก้ไขประวัติเด็กทุกคน
                   </p>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <input
-                    type="text"
-                    placeholder="ป้อนรหัสผ่านผู้ดูแลระบบ (เช่น 1234)..."
-                    value={settings.adminPasscode || ""}
-                    onChange={(e) => handleAdminPasscodeChange(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:outline-none transition-colors"
-                  />
+                  <div className="relative flex items-center">
+                    <input
+                      type={showAdminPasscodeConfig ? "text" : "password"}
+                      placeholder="ป้อนรหัสผ่านผู้ดูแลระบบ (เช่น 1234)..."
+                      value={settings.adminPasscode || ""}
+                      onChange={(e) => handleAdminPasscodeChange(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 pl-4 pr-10 py-2 text-xs font-medium text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminPasscodeConfig(!showAdminPasscodeConfig)}
+                      className="absolute right-3.5 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 cursor-pointer select-none"
+                      title={showAdminPasscodeConfig ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+                    >
+                      {showAdminPasscodeConfig ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      )}
+                    </button>
+                  </div>
                   <button
                     onClick={handleSaveAdminPasscode}
                     disabled={isSavingAdminPasscode}
@@ -1410,8 +1461,8 @@ export default function SettingsPage() {
                 {adminPasscodeStatusMessage && (
                   <div className={`rounded-xl px-4 py-2.5 text-center text-xs font-bold border animate-fade-in ${
                     adminPasscodeStatusMessage.type === "success"
-                      ? "bg-emerald-50 border-emerald-100 text-emerald-800"
-                      : "bg-red-50 border-red-100 text-red-800"
+                      ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-100 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-400"
+                      : "bg-red-50 dark:bg-red-950/20 border-red-100 dark:border-red-900/50 text-red-800 dark:text-red-400"
                   }`}>
                     {adminPasscodeStatusMessage.text}
                   </div>
