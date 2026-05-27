@@ -1,6 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { getSettings } from "@/lib/db";
+import { decryptSession } from "@/lib/auth";
+
+export async function GET() {
+  try {
+    const cookieStore = await cookies();
+    
+    // Check admin passcode verification cookie
+    const adminAuthorized = cookieStore.get("admin_authorized")?.value;
+    if (adminAuthorized === "true") {
+      return NextResponse.json({ authorized: true, role: "admin" });
+    }
+    
+    // Check teacher session
+    const teacherSession = cookieStore.get("teacher_session")?.value;
+    if (teacherSession) {
+      const user = decryptSession(teacherSession);
+      if (user) {
+        return NextResponse.json({ authorized: true, role: user.role });
+      }
+    }
+    
+    return NextResponse.json({ authorized: false });
+  } catch (error) {
+    console.error("GET verify-passcode error:", error);
+    return NextResponse.json({ authorized: false });
+  }
+}
+
 
 export async function POST(req: NextRequest) {
   try {

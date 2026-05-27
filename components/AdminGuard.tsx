@@ -16,15 +16,33 @@ export default function AdminGuard({ children, allowTeacher = false }: AdminGuar
   const [showPasscode, setShowPasscode] = useState(false);
 
   useEffect(() => {
-    // Check validation status on mount
-    const status = localStorage.getItem("adminValidated");
-    const teacherSession = localStorage.getItem("teacherSession");
-    
-    if (status === "true" || (allowTeacher && teacherSession)) {
-      setIsValidated(true);
-    } else {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch("/api/auth/verify-passcode");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.authorized) {
+            if (data.role === "admin") {
+              localStorage.setItem("adminValidated", "true");
+              setIsValidated(true);
+              return;
+            }
+            if (allowTeacher && data.role === "teacher") {
+              setIsValidated(true);
+              return;
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error verifying admin passcode cookie:", e);
+      }
+      
+      // Server rejected or cookie expired
+      localStorage.removeItem("adminValidated");
       setIsValidated(false);
-    }
+    };
+
+    checkAuth();
   }, [allowTeacher]);
 
   const handleSubmit = async (e: React.FormEvent) => {
