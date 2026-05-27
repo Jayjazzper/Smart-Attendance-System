@@ -475,7 +475,7 @@ export default function StudentsPage() {
                 <div className="absolute -bottom-10 -right-10 w-24 h-24 rounded-full bg-indigo-400/10 blur-xl pointer-events-none"></div>
 
                 {/* Emergency & Medical Info Badge (Functional - replaces gold chip) */}
-                <div className="absolute top-[88px] right-4 flex flex-col items-end gap-1.5 z-20">
+                <div className="absolute top-[88px] right-2 flex flex-col items-end gap-1.5 z-20">
                   {selectedStudentForCard.bloodGroup || selectedStudentForCard.emergencyPhone || selectedStudentForCard.medicalAlert ? (
                     <>
                       {/* Blood Group Pill */}
@@ -514,11 +514,11 @@ export default function StudentsPage() {
                     /* Clickable button to add emergency info (Hidden on print) */
                     <Link
                       href={`/students/${selectedStudentForCard.id}`}
-                      className="no-print flex flex-col items-center justify-center w-20 h-10 rounded-xl bg-red-50 hover:bg-red-100 border border-red-200/60 shadow-sm transition-colors text-red-650 cursor-pointer p-1"
+                      className="no-print flex flex-col items-center justify-center w-[72px] h-[38px] rounded-xl bg-red-50 hover:bg-red-100 border border-red-200/60 shadow-sm transition-colors text-red-650 cursor-pointer p-1"
                       title="ไม่มีข้อมูลฉุกเฉิน คลิกเพื่อแก้ไขประวัตินักเรียนและเพิ่มข้อมูล"
                     >
-                      <span className="text-[14px] leading-none mb-0.5">🏥</span>
-                      <span className="text-[7.5px] font-extrabold text-red-700 leading-none tracking-tighter text-center">
+                      <span className="text-[12px] leading-none mb-0.5">🏥</span>
+                      <span className="text-[7px] font-extrabold text-red-700 leading-none tracking-tighter text-center">
                         + เพิ่มข้อมูลฉุกเฉิน
                       </span>
                     </Link>
@@ -559,9 +559,9 @@ export default function StudentsPage() {
                 <div className="flex-1 flex flex-col items-center justify-between p-4 pt-5 z-10">
                   {/* Photo Container */}
                   <div className="flex flex-col items-center gap-2.5">
-                    {/* Glowing Premium Border Ring */}
-                    <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-tr from-cyan-400 via-indigo-500 to-purple-500 shadow-md">
-                      <div className="w-full h-full rounded-full border-2 border-white/95 bg-gradient-to-tr from-blue-50 to-indigo-50 flex items-center justify-center overflow-hidden">
+                    {/* Glowing Premium Border Ring (Rounded Portrait Rectangle 3:4 aspect ratio) */}
+                    <div className="w-[84px] h-[112px] rounded-2xl p-1 bg-gradient-to-tr from-cyan-400 via-indigo-500 to-purple-500 shadow-md">
+                      <div className="w-full h-full rounded-xl border-2 border-white/95 bg-gradient-to-tr from-blue-50 to-indigo-50 flex items-center justify-center overflow-hidden">
                         {selectedStudentForCard.avatarUrl ? (
                           <img
                             src={selectedStudentForCard.avatarUrl}
