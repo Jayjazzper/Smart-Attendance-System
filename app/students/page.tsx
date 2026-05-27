@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Student } from "@/lib/types";
 import AdminGuard from "@/components/AdminGuard";
+import { toPng, toJpeg } from "html-to-image";
 
 export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -20,6 +21,30 @@ export default function StudentsPage() {
   const [calendarYear, setCalendarYear] = useState<number>(new Date().getFullYear());
   const [calendarMonth, setCalendarMonth] = useState<number>(new Date().getMonth());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [downloadingFormat, setDownloadingFormat] = useState<"png" | "jpg" | null>(null);
+
+  const handleDownloadCard = async (format: "png" | "jpg") => {
+    const cardEl = document.getElementById("student-card-print-area");
+    if (!cardEl) return;
+    setDownloadingFormat(format);
+    try {
+      let dataUrl = "";
+      if (format === "png") {
+        dataUrl = await toPng(cardEl, { cacheBust: true, pixelRatio: 2 });
+      } else {
+        dataUrl = await toJpeg(cardEl, { cacheBust: true, pixelRatio: 2, quality: 0.95 });
+      }
+      const link = document.createElement("a");
+      link.download = `student-card-${selectedStudentForCard?.id || "id"}.${format}`;
+      link.href = dataUrl;
+      link.click();
+    } catch (error) {
+      console.error("Error generating image:", error);
+      alert("เกิดข้อผิดพลาดในการสร้างไฟล์รูปภาพสำหรับการดาวน์โหลด");
+    } finally {
+      setDownloadingFormat(null);
+    }
+  };
 
   const handleOpenCalendar = async (student: Student) => {
     setSelectedStudentForCalendar(student);
@@ -510,6 +535,7 @@ export default function StudentsPage() {
                     <img
                       src={schoolSettings.schoolLogo}
                       alt="Logo"
+                      crossOrigin="anonymous"
                       className="w-9 h-9 rounded-full object-cover bg-white p-0.5 shrink-0 border border-white/10"
                     />
                   ) : (
@@ -540,6 +566,7 @@ export default function StudentsPage() {
                           <img
                             src={selectedStudentForCard.avatarUrl}
                             alt={selectedStudentForCard.name}
+                            crossOrigin="anonymous"
                             className="w-full h-full object-cover"
                           />
                         ) : selectedStudentForCard.name.includes("หญิง") || selectedStudentForCard.name.includes("สาว") || selectedStudentForCard.name.includes("ด.ญ.") ? (
@@ -590,6 +617,7 @@ export default function StudentsPage() {
                         <img
                           src={`https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(selectedStudentForCard.id)}`}
                           alt="Student ID QR Code"
+                          crossOrigin="anonymous"
                           className="w-[65px] h-[65px] object-contain"
                           loading="lazy"
                         />
@@ -603,6 +631,7 @@ export default function StudentsPage() {
                         <img
                           src={`https://bwipjs-api.metafloor.com/?bcid=code128&text=${encodeURIComponent(selectedStudentForCard.id)}&scale=3&rotate=N`}
                           alt="Student ID Barcode"
+                          crossOrigin="anonymous"
                           className="w-[110px] h-[45px] object-contain"
                           loading="lazy"
                         />
@@ -626,20 +655,41 @@ export default function StudentsPage() {
             </div>
 
             {/* Actions */}
-            <div className="flex gap-3 mt-2 no-print">
-              <button
-                onClick={() => setSelectedStudentForCard(null)}
-                className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 py-2.5 text-xs font-bold text-slate-500 dark:text-slate-450 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              >
-                ปิดหน้าต่าง
-              </button>
-              <button
-                onClick={() => window.print()}
-                className="flex-1 rounded-xl bg-blue-600 py-2.5 text-xs font-bold text-white shadow-sm shadow-blue-500/20 hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
-                พิมพ์บัตรประจำตัว
-              </button>
+            <div className="flex flex-col gap-2 mt-2 no-print">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSelectedStudentForCard(null)}
+                  className="flex-1 rounded-xl border border-slate-200 dark:border-slate-700 py-2 text-xs font-bold text-slate-500 dark:text-slate-450 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  ปิดหน้าต่าง
+                </button>
+                <button
+                  onClick={() => window.print()}
+                  className="flex-1 rounded-xl bg-blue-600 py-2 text-xs font-bold text-white shadow-sm shadow-blue-500/20 hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+                  พิมพ์บัตร
+                </button>
+              </div>
+              
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleDownloadCard("png")}
+                  disabled={downloadingFormat !== null}
+                  className="flex-1 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 py-2.5 text-[11px] font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  {downloadingFormat === "png" ? "กำลังเซฟ PNG..." : "ดาวน์โหลด PNG"}
+                </button>
+                <button
+                  onClick={() => handleDownloadCard("jpg")}
+                  disabled={downloadingFormat !== null}
+                  className="flex-1 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 py-2.5 text-[11px] font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  {downloadingFormat === "jpg" ? "กำลังเซฟ JPG..." : "ดาวน์โหลด JPG"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -10,7 +10,8 @@ interface AdminGuardProps {
 
 export default function AdminGuard({ children, allowTeacher = false }: AdminGuardProps) {
   const [isValidated, setIsValidated] = useState<boolean | null>(null);
-  const [passcode, setPasscode] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPasscode, setShowPasscode] = useState(false);
@@ -47,8 +48,8 @@ export default function AdminGuard({ children, allowTeacher = false }: AdminGuar
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!passcode) {
-      setErrorMsg("กรุณากรอกรหัสผ่าน");
+    if (!username || !password) {
+      setErrorMsg("กรุณากรอกชื่อผู้ใช้และรหัสผ่าน");
       return;
     }
 
@@ -56,21 +57,30 @@ export default function AdminGuard({ children, allowTeacher = false }: AdminGuar
     setErrorMsg("");
 
     try {
-      const res = await fetch("/api/auth/verify-passcode", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ passcode, type: "admin" })
+        body: JSON.stringify({ username, password })
       });
 
       if (res.ok) {
-        localStorage.setItem("adminValidated", "true");
-        setIsValidated(true);
+        const data = await res.json();
+        const role = data.user?.role;
+        if (role === "admin" || (allowTeacher && role === "teacher")) {
+          localStorage.setItem("adminValidated", role === "admin" ? "true" : "false");
+          localStorage.setItem("teacherSession", JSON.stringify(data.user));
+          setIsValidated(true);
+          // Dispatch storage event to update other components
+          window.dispatchEvent(new Event("storage"));
+        } else {
+          setErrorMsg("คุณไม่มีสิทธิ์เข้าใช้งานพื้นที่นี้");
+        }
       } else {
         const data = await res.json().catch(() => ({}));
-        setErrorMsg(data.error || "รหัสผ่านผู้ดูแลระบบไม่ถูกต้อง");
+        setErrorMsg(data.error || "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
       }
     } catch (err) {
-      setErrorMsg("เกิดข้อผิดพลาดในการตรวจสอบรหัสผ่าน");
+      setErrorMsg("เกิดข้อผิดพลาดในการตรวจสอบสิทธิ์");
     } finally {
       setLoading(false);
     }
@@ -121,7 +131,7 @@ export default function AdminGuard({ children, allowTeacher = false }: AdminGuar
               พื้นที่เฉพาะผู้ดูแลระบบ (Admin Area)
             </h2>
             <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 leading-relaxed px-4">
-              หน้านี้มีข้อมูลส่วนบุคคลของเด็กนักเรียนและโทเคนระบบ กรุณากรอกรหัสผ่านผู้ดูแลระบบ (Admin Passcode) เพื่อเข้าใช้งาน
+              หน้านี้มีข้อมูลส่วนบุคคลของเด็กนักเรียนและโทเคนระบบ กรุณากรอกชื่อผู้ใช้และรหัสผ่านเพื่อเข้าใช้งาน
             </p>
           </div>
         </div>
@@ -129,15 +139,26 @@ export default function AdminGuard({ children, allowTeacher = false }: AdminGuar
         {/* Lock Screen Form */}
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">รหัสผ่านผู้ดูแลระบบ (Admin Passcode)</label>
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">ชื่อผู้ใช้งาน (Username)</label>
+            <input
+              type="text"
+              placeholder="ป้อนชื่อผู้ใช้งานแอดมิน..."
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-3 text-xs font-semibold text-slate-700 dark:text-slate-350 placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
+              autoFocus
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">รหัสผ่าน (Password)</label>
             <div className="relative flex items-center">
               <input
                 type={showPasscode ? "text" : "password"}
-                placeholder="ป้อนรหัสผ่านเข้าหน้าตั้งค่า..."
-                value={passcode}
-                onChange={(e) => setPasscode(e.target.value)}
+                placeholder="ป้อนรหัสผ่าน..."
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 pl-4 pr-10 py-3 text-xs font-semibold text-slate-700 dark:text-slate-300 placeholder-slate-400 dark:placeholder-slate-500 focus:border-blue-500 dark:focus:border-blue-400 focus:outline-none transition-colors"
-                autoFocus
               />
               <button
                 type="button"
@@ -165,7 +186,7 @@ export default function AdminGuard({ children, allowTeacher = false }: AdminGuar
             disabled={loading}
             className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-blue-600 px-4 py-3 text-xs font-bold text-white shadow-sm shadow-blue-500/20 hover:bg-blue-700 disabled:bg-slate-300 transition-colors cursor-pointer h-10.5"
           >
-            {loading ? "กำลังตรวจสอบรหัส..." : "ยืนยันรหัสผ่านเพื่อเข้าใช้งาน"}
+            {loading ? "กำลังตรวจสอบข้อมูลล็อกอิน..." : "ยืนยันเข้าใช้งาน"}
           </button>
         </form>
 
