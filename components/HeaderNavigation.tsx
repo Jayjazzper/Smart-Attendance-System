@@ -51,6 +51,14 @@ export default function HeaderNavigation() {
     (path) => pathname.startsWith(path)
   );
 
+  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!currentUser) {
+      e.preventDefault();
+      setDropdownOpen(false);
+      window.dispatchEvent(new CustomEvent("open-access-control-login"));
+    }
+  };
+
   return (
     <div className="flex items-center gap-1.5 sm:gap-2 select-none">
       {/* Core Links */}
@@ -98,6 +106,7 @@ export default function HeaderNavigation() {
           <div className="absolute right-0 mt-2.5 w-48 rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-2 shadow-xl z-50 animate-scale-up">
             <Link
               href="/dashboard"
+              onClick={handleLinkClick}
               className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${
                 pathname === "/dashboard" ? "text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20" : "text-slate-700 dark:text-slate-350"
               }`}
@@ -107,6 +116,7 @@ export default function HeaderNavigation() {
             </Link>
             <Link
               href="/reports"
+              onClick={handleLinkClick}
               className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${
                 pathname === "/reports" ? "text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20" : "text-slate-700 dark:text-slate-350"
               }`}
@@ -116,6 +126,7 @@ export default function HeaderNavigation() {
             </Link>
             <Link
               href="/register"
+              onClick={handleLinkClick}
               className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${
                 pathname === "/register" ? "text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20" : "text-slate-700 dark:text-slate-350"
               }`}
@@ -125,6 +136,7 @@ export default function HeaderNavigation() {
             </Link>
             <Link
               href="/students"
+              onClick={handleLinkClick}
               className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${
                 pathname === "/students" ? "text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20" : "text-slate-700 dark:text-slate-350"
               }`}
@@ -137,6 +149,7 @@ export default function HeaderNavigation() {
                 <div className="border-t border-slate-100 dark:border-slate-800 my-1"></div>
                 <Link
                   href="/settings"
+                  onClick={handleLinkClick}
                   className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${
                     pathname === "/settings" ? "text-blue-600 dark:text-blue-400 bg-blue-50/50 dark:bg-blue-950/20" : "text-slate-700 dark:text-slate-350"
                   }`}
@@ -169,6 +182,7 @@ export default function HeaderNavigation() {
             ) : (
               <Link
                 href="/settings"
+                onClick={handleLinkClick}
                 className="w-full flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/20 hover:text-blue-700 transition-colors text-left"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>

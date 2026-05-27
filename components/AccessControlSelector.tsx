@@ -138,6 +138,16 @@ export default function AccessControlSelector() {
     setIsOpen(true);
   };
 
+  useEffect(() => {
+    const handleOpenLogin = () => {
+      handleOpen();
+    };
+    window.addEventListener("open-access-control-login", handleOpenLogin);
+    return () => {
+      window.removeEventListener("open-access-control-login", handleOpenLogin);
+    };
+  }, []);
+
   const handleClose = () => {
     setShowPasscode(false);
     setIsRecovering(false);
