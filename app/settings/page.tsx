@@ -4,6 +4,44 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import AdminGuard from "@/components/AdminGuard";
 
+const GRADE_LEVELS = {
+  kindergarten: [
+    { value: "อนุบาล 2", label: "อนุบาล 2" },
+    { value: "อนุบาล 3", label: "อนุบาล 3" },
+  ],
+  primary: [
+    { value: "ประถมศึกษาปีที่ 1", label: "ประถมศึกษาปีที่ 1 (ป.1)" },
+    { value: "ประถมศึกษาปีที่ 2", label: "ประถมศึกษาปีที่ 2 (ป.2)" },
+    { value: "ประถมศึกษาปีที่ 3", label: "ประถมศึกษาปีที่ 3 (ป.3)" },
+    { value: "ประถมศึกษาปีที่ 4", label: "ประถมศึกษาปีที่ 4 (ป.4)" },
+    { value: "ประถมศึกษาปีที่ 5", label: "ประถมศึกษาปีที่ 5 (ป.5)" },
+    { value: "ประถมศึกษาปีที่ 6", label: "ประถมศึกษาปีที่ 6 (ป.6)" },
+  ],
+  secondary: [
+    { value: "มัธยมศึกษาปีที่ 1", label: "มัธยมศึกษาปีที่ 1 (ม.1)" },
+    { value: "มัธยมศึกษาปีที่ 2", label: "มัธยมศึกษาปีที่ 2 (ม.2)" },
+    { value: "มัธยมศึกษาปีที่ 3", label: "มัธยมศึกษาปีที่ 3 (ม.3)" },
+    { value: "มัธยมศึกษาปีที่ 4", label: "มัธยมศึกษาปีที่ 4 (ม.4)" },
+    { value: "มัธยมศึกษาปีที่ 5", label: "มัธยมศึกษาปีที่ 5 (ม.5)" },
+    { value: "มัธยมศึกษาปีที่ 6", label: "มัธยมศึกษาปีที่ 6 (ม.6)" },
+  ],
+};
+
+function getAbbreviatedClassroom(grade: string, room: string): string {
+  const roomNumber = room.replace("ห้อง ", "");
+  const num = grade.split(" ").pop() || "";
+  if (grade.startsWith("อนุบาล")) {
+    return `อ.${num}/${roomNumber}`;
+  }
+  if (grade.startsWith("ประถม")) {
+    return `ป.${num}/${roomNumber}`;
+  }
+  if (grade.startsWith("มัธยม")) {
+    return `ม.${num}/${roomNumber}`;
+  }
+  return `${grade}/${roomNumber}`;
+}
+
 interface ClassroomSetting {
   lineToken?: string;
 }
@@ -18,6 +56,7 @@ interface SystemSettings {
   schoolLogo?: string;
   enableAutoSummary?: boolean;
   summaryTime?: string;
+  maxRooms?: number;
 }
 
 interface Student {
@@ -38,7 +77,8 @@ export default function SettingsPage() {
     schoolDistrict: "", 
     schoolLogo: "",
     enableAutoSummary: false,
-    summaryTime: "08:30"
+    summaryTime: "08:30",
+    maxRooms: 15
   });
   const [loading, setLoading] = useState(true);
   
@@ -155,7 +195,9 @@ export default function SettingsPage() {
     classrooms: [] as string[]
   });
   const [teacherStatusMsg, setTeacherStatusMsg] = useState<{ text: string; type: "success" | "error" } | null>(null);
-  const [customClass, setCustomClass] = useState("");
+  const [customLevel, setCustomLevel] = useState<"kindergarten" | "primary" | "secondary">("primary");
+  const [customGrade, setCustomGrade] = useState("ประถมศึกษาปีที่ 1");
+  const [customRoom, setCustomRoom] = useState("ห้อง 1");
 
   // Password visibility states
   const [showTeacherPassword, setShowTeacherPassword] = useState(false);
@@ -268,13 +310,12 @@ export default function SettingsPage() {
   };
 
   const handleAddCustomClass = () => {
-    const trimmed = customClass.trim();
-    if (trimmed && !teacherForm.classrooms.includes(trimmed)) {
+    const abbreviatedClass = getAbbreviatedClassroom(customGrade, customRoom);
+    if (!teacherForm.classrooms.includes(abbreviatedClass)) {
       setTeacherForm(prev => ({
         ...prev,
-        classrooms: [...prev.classrooms, trimmed]
+        classrooms: [...prev.classrooms, abbreviatedClass]
       }));
-      setCustomClass("");
     }
   };
 
@@ -518,6 +559,11 @@ export default function SettingsPage() {
 
   const handleSchoolLogoChange = (val: string) => {
     setSettings(prev => ({ ...prev, schoolLogo: val }));
+  };
+
+  const handleMaxRoomsChange = (val: string) => {
+    const num = parseInt(val, 10);
+    setSettings(prev => ({ ...prev, maxRooms: isNaN(num) ? 15 : num }));
   };
 
   const handleSaveProfile = async () => {
@@ -822,6 +868,20 @@ export default function SettingsPage() {
                     placeholder="ป้อนสังกัดหน่วยงาน..."
                     value={settings.schoolDistrict || ""}
                     onChange={(e) => handleSchoolDistrictChange(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:outline-none transition-colors"
+                  />
+                </div>
+
+                {/* Max Rooms per Grade */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-slate-700">จำนวนห้องเรียนสูงสุดต่อชั้นเรียน (Max Rooms per Grade)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100"
+                    placeholder="เช่น 15"
+                    value={settings.maxRooms ?? 15}
+                    onChange={(e) => handleMaxRoomsChange(e.target.value)}
                     className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 placeholder-slate-400 focus:border-blue-500 focus:outline-none transition-colors"
                   />
                 </div>
@@ -1299,20 +1359,63 @@ export default function SettingsPage() {
                     </div>
                     
                     {/* Add Custom Classroom Name */}
-                    <div className="flex gap-1.5 items-center mt-1">
-                      <input
-                        type="text"
-                        placeholder="เพิ่มห้องเรียนอื่น..."
-                        value={customClass}
-                        onChange={(e) => setCustomClass(e.target.value)}
-                        className="flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2 py-1.5 text-[10px] font-semibold text-slate-700 dark:text-slate-300 focus:outline-none"
-                      />
+                    <div className="flex flex-col gap-2 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 mt-1">
+                      <span className="text-[10px] font-bold text-slate-500">เพิ่มห้องเรียนกำหนดเอง:</span>
+                      
+                      {/* Level Buttons */}
+                      <div className="grid grid-cols-3 gap-1">
+                        {(["kindergarten", "primary", "secondary"] as const).map((lvl) => {
+                          const labels = { kindergarten: "อนุบาล", primary: "ประถม", secondary: "มัธยม" };
+                          const active = customLevel === lvl;
+                          return (
+                            <button
+                              key={lvl}
+                              type="button"
+                              onClick={() => {
+                                setCustomLevel(lvl);
+                                setCustomGrade(GRADE_LEVELS[lvl][0].value);
+                              }}
+                              className={`py-1 text-[10px] font-black rounded-lg transition-all cursor-pointer border ${
+                                active
+                                  ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                                  : "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-850 text-slate-600 dark:text-slate-400 hover:bg-slate-50"
+                              }`}
+                            >
+                              {labels[lvl]}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Grade and Room selects */}
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          value={customGrade}
+                          onChange={(e) => setCustomGrade(e.target.value)}
+                          className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-350 focus:outline-none cursor-pointer"
+                        >
+                          {GRADE_LEVELS[customLevel].map((grd) => (
+                            <option key={grd.value} value={grd.value}>{grd.label}</option>
+                          ))}
+                        </select>
+                        
+                        <select
+                          value={customRoom}
+                          onChange={(e) => setCustomRoom(e.target.value)}
+                          className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-350 focus:outline-none cursor-pointer"
+                        >
+                          {Array.from({ length: settings.maxRooms ?? 15 }, (_, i) => `ห้อง ${i + 1}`).map((rm) => (
+                            <option key={rm} value={rm}>{rm}</option>
+                          ))}
+                        </select>
+                      </div>
+
                       <button
                         type="button"
                         onClick={handleAddCustomClass}
-                        className="bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg text-[10px] font-black border border-blue-100 dark:border-blue-900/50 cursor-pointer"
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg text-[10px] font-black shadow-sm cursor-pointer transition-colors"
                       >
-                        เพิ่มห้อง
+                        เพิ่มห้องเรียนนี้
                       </button>
                     </div>
                   </div>

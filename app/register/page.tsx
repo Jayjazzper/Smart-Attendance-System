@@ -181,6 +181,8 @@ export default function RegisterPage() {
     }));
   };
 
+  const [maxRooms, setMaxRooms] = useState(15);
+
   useEffect(() => {
     async function loadCurrentUser() {
       try {
@@ -207,7 +209,21 @@ export default function RegisterPage() {
         console.error("Error loading user session:", e);
       }
     }
+    async function loadSettings() {
+      try {
+        const res = await fetch("/api/settings");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.maxRooms !== undefined) {
+            setMaxRooms(data.maxRooms);
+          }
+        }
+      } catch (e) {
+        console.error("Error loading settings:", e);
+      }
+    }
     loadCurrentUser();
+    loadSettings();
   }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -517,50 +533,71 @@ export default function RegisterPage() {
               </div>
 
               {/* Division & Grade & Room */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1.5 col-span-2">
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-bold text-slate-700">ระดับชั้นเรียน</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <select
-                      name="division"
-                      value={formData.division}
-                      onChange={handleChange}
-                      disabled={status === "capturing" || status === "scanning" || status === "success"}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none transition-colors"
-                    >
-                      {LEVELS.map((lvl) => (
-                        <option key={lvl.value} value={lvl.value}>{lvl.label}</option>
-                      ))}
-                    </select>
-                    
+                  
+                  {/* Level Tabs */}
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(["kindergarten", "primary", "secondary"] as const).map((lvl) => {
+                      const labels = { kindergarten: "อนุบาล", primary: "ประถม", secondary: "มัธยม" };
+                      const active = formData.division === lvl;
+                      return (
+                        <button
+                          key={lvl}
+                          type="button"
+                          disabled={status === "capturing" || status === "scanning" || status === "success"}
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              division: lvl,
+                              grade: GRADE_LEVELS[lvl][0].value,
+                            }));
+                          }}
+                          className={`py-2 text-xs font-black rounded-xl transition-all cursor-pointer border ${
+                            active
+                              ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                              : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                          }`}
+                        >
+                          {labels[lvl]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-bold text-slate-700">ชั้นเรียน (Grade)</label>
                     <select
                       name="grade"
                       value={formData.grade}
                       onChange={handleChange}
                       disabled={status === "capturing" || status === "scanning" || status === "success"}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none transition-colors"
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none transition-colors cursor-pointer"
                     >
                       {GRADE_LEVELS[formData.division].map((grd) => (
                         <option key={grd.value} value={grd.value}>{grd.label}</option>
                       ))}
                     </select>
                   </div>
-                </div>
-
-                <div className="flex flex-col gap-1.5 col-span-2">
-                  <label htmlFor="room" className="text-xs font-bold text-slate-700">ห้องเรียน</label>
-                  <select
-                    id="room"
-                    name="room"
-                    value={formData.room}
-                    onChange={handleChange}
-                    disabled={status === "capturing" || status === "scanning" || status === "success"}
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none transition-colors"
-                  >
-                    {ROOMS.map((rm) => (
-                      <option key={rm} value={rm}>{rm}</option>
-                    ))}
-                  </select>
+                  
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="room" className="text-xs font-bold text-slate-700">ห้องเรียน (Room)</label>
+                    <select
+                      id="room"
+                      name="room"
+                      value={formData.room}
+                      onChange={handleChange}
+                      disabled={status === "capturing" || status === "scanning" || status === "success"}
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:outline-none transition-colors cursor-pointer"
+                    >
+                      {Array.from({ length: maxRooms }, (_, i) => `ห้อง ${i + 1}`).map((rm) => (
+                        <option key={rm} value={rm}>{rm}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               </div>
 

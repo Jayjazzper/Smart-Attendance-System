@@ -937,6 +937,7 @@ export interface SystemSettings {
   summaryTime?: string; // Time to send daily summary, e.g., "08:30"
   lastSummarySentDate?: Record<string, string>; // Map of classroom -> last sent YYYY-MM-DD
   teachers?: Teacher[];
+  maxRooms?: number; // Maximum number of rooms per grade
 }
 
 function ensureDefaultAdmin(settings: SystemSettings): { settings: SystemSettings; changed: boolean } {
@@ -1084,6 +1085,10 @@ export async function getSettings(): Promise<SystemSettings> {
     } finally {
       release();
     }
+  }
+
+  if (rawSettings && rawSettings.maxRooms === undefined) {
+    rawSettings.maxRooms = 15;
   }
 
   // Ensure default admin exists

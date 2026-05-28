@@ -4,6 +4,44 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+const GRADE_LEVELS = {
+  kindergarten: [
+    { value: "อนุบาล 2", label: "อนุบาล 2" },
+    { value: "อนุบาล 3", label: "อนุบาล 3" },
+  ],
+  primary: [
+    { value: "ประถมศึกษาปีที่ 1", label: "ประถมศึกษาปีที่ 1 (ป.1)" },
+    { value: "ประถมศึกษาปีที่ 2", label: "ประถมศึกษาปีที่ 2 (ป.2)" },
+    { value: "ประถมศึกษาปีที่ 3", label: "ประถมศึกษาปีที่ 3 (ป.3)" },
+    { value: "ประถมศึกษาปีที่ 4", label: "ประถมศึกษาปีที่ 4 (ป.4)" },
+    { value: "ประถมศึกษาปีที่ 5", label: "ประถมศึกษาปีที่ 5 (ป.5)" },
+    { value: "ประถมศึกษาปีที่ 6", label: "ประถมศึกษาปีที่ 6 (ป.6)" },
+  ],
+  secondary: [
+    { value: "มัธยมศึกษาปีที่ 1", label: "มัธยมศึกษาปีที่ 1 (ม.1)" },
+    { value: "มัธยมศึกษาปีที่ 2", label: "มัธยมศึกษาปีที่ 2 (ม.2)" },
+    { value: "มัธยมศึกษาปีที่ 3", label: "มัธยมศึกษาปีที่ 3 (ม.3)" },
+    { value: "มัธยมศึกษาปีที่ 4", label: "มัธยมศึกษาปีที่ 4 (ม.4)" },
+    { value: "มัธยมศึกษาปีที่ 5", label: "มัธยมศึกษาปีที่ 5 (ม.5)" },
+    { value: "มัธยมศึกษาปีที่ 6", label: "มัธยมศึกษาปีที่ 6 (ม.6)" },
+  ],
+};
+
+function getAbbreviatedClassroom(grade: string, room: string): string {
+  const roomNumber = room.replace("ห้อง ", "");
+  const num = grade.split(" ").pop() || "";
+  if (grade.startsWith("อนุบาล")) {
+    return `อ.${num}/${roomNumber}`;
+  }
+  if (grade.startsWith("ประถม")) {
+    return `ป.${num}/${roomNumber}`;
+  }
+  if (grade.startsWith("มัธยม")) {
+    return `ม.${num}/${roomNumber}`;
+  }
+  return `${grade}/${roomNumber}`;
+}
+
 export default function TeacherRegisterPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -21,12 +59,14 @@ export default function TeacherRegisterPage() {
   // Classroom states
   const [selectedClassrooms, setSelectedClassrooms] = useState<string[]>([]);
   const [classroomsList, setClassroomsList] = useState<string[]>([]);
-  const [customClass, setCustomClass] = useState("");
+  const [maxRooms, setMaxRooms] = useState(15);
+  const [customLevel, setCustomLevel] = useState<"kindergarten" | "primary" | "secondary">("kindergarten");
+  const [customGrade, setCustomGrade] = useState("อนุบาล 2");
+  const [customRoom, setCustomRoom] = useState("ห้อง 1");
   
   // Status states
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
-
   // Fetch unique classrooms from students on mount
   useEffect(() => {
     const fetchClassrooms = async () => {
@@ -44,7 +84,21 @@ export default function TeacherRegisterPage() {
         console.error("Failed to fetch classrooms for register form:", err);
       }
     };
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch("/api/settings");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.maxRooms !== undefined) {
+            setMaxRooms(data.maxRooms);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch settings for maxRooms:", err);
+      }
+    };
     fetchClassrooms();
+    fetchSettings();
   }, []);
 
   const handleCheckboxChange = (cls: string) => {
@@ -55,16 +109,14 @@ export default function TeacherRegisterPage() {
 
   const handleAddCustomClass = (e: React.MouseEvent) => {
     e.preventDefault();
-    const trimmed = customClass.trim();
-    if (trimmed && !selectedClassrooms.includes(trimmed)) {
-      setSelectedClassrooms(prev => [...prev, trimmed]);
-      if (!classroomsList.includes(trimmed)) {
-        setClassroomsList(prev => [...prev, trimmed].sort());
+    const abbreviatedClass = getAbbreviatedClassroom(customGrade, customRoom);
+    if (!selectedClassrooms.includes(abbreviatedClass)) {
+      setSelectedClassrooms(prev => [...prev, abbreviatedClass]);
+      if (!classroomsList.includes(abbreviatedClass)) {
+        setClassroomsList(prev => [...prev, abbreviatedClass].sort());
       }
-      setCustomClass("");
     }
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.username || !formData.password || !formData.name || !formData.email || !formData.teacherPasscode) {
@@ -267,22 +319,67 @@ export default function TeacherRegisterPage() {
             </div>
             
             {/* Add Custom Classroom input */}
-            <div className="flex gap-2 mt-1">
-              <input
-                type="text"
-                placeholder="เพิ่มห้องเรียนอื่น (เช่น ม.1/1)..."
-                value={customClass}
-                onChange={(e) => setCustomClass(e.target.value)}
-                disabled={loading}
-                className="flex-1 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 focus:outline-none focus:border-blue-500"
-              />
+            <div className="flex flex-col gap-2 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 mt-1">
+              <span className="text-[10px] font-bold text-slate-500">เพิ่มห้องเรียนกำหนดเอง:</span>
+              
+              {/* Level Buttons */}
+              <div className="grid grid-cols-3 gap-1">
+                {(["kindergarten", "primary", "secondary"] as const).map((lvl) => {
+                  const labels = { kindergarten: "อนุบาล", primary: "ประถม", secondary: "มัธยม" };
+                  const active = customLevel === lvl;
+                  return (
+                    <button
+                      key={lvl}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => {
+                        setCustomLevel(lvl);
+                        setCustomGrade(GRADE_LEVELS[lvl][0].value);
+                      }}
+                      className={`py-1.5 text-[10px] font-black rounded-lg transition-all cursor-pointer border ${
+                        active
+                          ? "bg-blue-600 border-blue-600 text-white shadow-sm"
+                          : "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-850 text-slate-600 dark:text-slate-400 hover:bg-slate-50"
+                      }`}
+                    >
+                      {labels[lvl]}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Grade and Room selects */}
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={customGrade}
+                  disabled={loading}
+                  onChange={(e) => setCustomGrade(e.target.value)}
+                  className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-350 focus:outline-none cursor-pointer"
+                >
+                  {GRADE_LEVELS[customLevel].map((grd) => (
+                    <option key={grd.value} value={grd.value}>{grd.label}</option>
+                  ))}
+                </select>
+                
+                <select
+                  value={customRoom}
+                  disabled={loading}
+                  onChange={(e) => setCustomRoom(e.target.value)}
+                  className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-2 py-1.5 text-[10px] font-bold text-slate-700 dark:text-slate-350 focus:outline-none cursor-pointer"
+                >
+                  {Array.from({ length: maxRooms }, (_, i) => `ห้อง ${i + 1}`).map((rm) => (
+                    <option key={rm} value={rm}>{rm}</option>
+                  ))}
+                </select>
+              </div>
+
               <button
                 type="button"
                 onClick={handleAddCustomClass}
-                disabled={loading || !customClass.trim()}
-                className="bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 hover:bg-blue-100 px-3 py-1.5 rounded-lg text-xs font-black border border-blue-100 dark:border-blue-900/50 cursor-pointer transition-colors"
+                disabled={loading}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg text-[10px] font-black shadow-sm cursor-pointer transition-colors"
               >
-                เพิ่มห้อง
+                เพิ่มห้องเรียนนี้
               </button>
             </div>
           </div>
