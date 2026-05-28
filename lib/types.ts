@@ -46,6 +46,13 @@ export interface LeaveRequest {
   reason: string;
   status: 'pending' | 'approved' | 'rejected';
   submittedAt: string; // ISO format string
+  contactEmail?: string;
+  contactLine?: string;
+  contactPhone?: string;
+  evidenceUrl?: string;
+  evidenceName?: string;
+  evidenceMimeType?: string;
+  evidenceBase64?: string;
 }
 
 export interface Teacher {

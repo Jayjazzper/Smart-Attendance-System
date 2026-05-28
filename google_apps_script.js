@@ -56,11 +56,11 @@ function doPost(e) {
     var leavesSheet = ss.getSheetByName("leaves");
     if (!leavesSheet) {
       leavesSheet = ss.insertSheet("leaves");
-      leavesSheet.appendRow(["id", "studentId", "studentName", "classroom", "startDate", "endDate", "type", "reason", "status", "submittedAt"]);
+      leavesSheet.appendRow(["id", "studentId", "studentName", "classroom", "startDate", "endDate", "type", "reason", "status", "submittedAt", "contactEmail", "contactLine", "contactPhone", "evidenceUrl"]);
     } else {
       // Ensure headers exist for all columns (upgrade existing sheets dynamically)
-      var leavesHeaders = leavesSheet.getRange(1, 1, 1, leavesSheet.getLastColumn() || 10).getValues()[0];
-      var requiredLeavesHeaders = ["id", "studentId", "studentName", "classroom", "startDate", "endDate", "type", "reason", "status", "submittedAt"];
+      var leavesHeaders = leavesSheet.getRange(1, 1, 1, leavesSheet.getLastColumn() || 14).getValues()[0];
+      var requiredLeavesHeaders = ["id", "studentId", "studentName", "classroom", "startDate", "endDate", "type", "reason", "status", "submittedAt", "contactEmail", "contactLine", "contactPhone", "evidenceUrl"];
       for (var h = 0; h < requiredLeavesHeaders.length; h++) {
         var hName = requiredLeavesHeaders[h];
         if (leavesHeaders.indexOf(hName) === -1) {
@@ -359,6 +359,10 @@ function doPost(e) {
       var idxReason = headers.indexOf("reason");
       var idxStatus = headers.indexOf("status");
       var idxSubmittedAt = headers.indexOf("submittedAt");
+      var idxContactEmail = headers.indexOf("contactEmail");
+      var idxContactLine = headers.indexOf("contactLine");
+      var idxContactPhone = headers.indexOf("contactPhone");
+      var idxEvidenceUrl = headers.indexOf("evidenceUrl");
       
       var leaves = [];
       for (var i = 1; i < data.length; i++) {
@@ -374,7 +378,11 @@ function doPost(e) {
             type: idxType !== -1 ? String(row[idxType]) : "personal",
             reason: idxReason !== -1 ? String(row[idxReason]) : "",
             status: idxStatus !== -1 ? String(row[idxStatus]) : "pending",
-            submittedAt: idxSubmittedAt !== -1 ? formatDateSafe(row[idxSubmittedAt]) : ""
+            submittedAt: idxSubmittedAt !== -1 ? formatDateSafe(row[idxSubmittedAt]) : "",
+            contactEmail: idxContactEmail !== -1 ? String(row[idxContactEmail]) : "",
+            contactLine: idxContactLine !== -1 ? String(row[idxContactLine]) : "",
+            contactPhone: idxContactPhone !== -1 ? String(row[idxContactPhone]) : "",
+            evidenceUrl: idxEvidenceUrl !== -1 ? String(row[idxEvidenceUrl]) : ""
           });
         }
       }
@@ -382,8 +390,25 @@ function doPost(e) {
       
     } else if (action === "addLeave") {
       var record = postData.record;
-      var headers = leavesSheet.getRange(1, 1, 1, leavesSheet.getLastColumn() || 10).getValues()[0];
+      var headers = leavesSheet.getRange(1, 1, 1, leavesSheet.getLastColumn() || 14).getValues()[0];
       var nextRow = leavesSheet.getLastRow() + 1;
+      
+      // Decode and save file to Google Drive if present
+      var evidenceUrl = "";
+      if (record.evidenceBase64 && record.evidenceName && record.evidenceMimeType) {
+        try {
+          var folderId = "1v7WgxbnH5-z4m7-XuoGF8ACp6TaqOIPn";
+          var folder = DriveApp.getFolderById(folderId);
+          
+          var fileData = Utilities.base64Decode(record.evidenceBase64);
+          var blob = Utilities.newBlob(fileData, record.evidenceMimeType, record.evidenceName);
+          var file = folder.createFile(blob);
+          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+          evidenceUrl = file.getUrl();
+        } catch (fileError) {
+          console.error("Error saving file to Google Drive: " + fileError.toString());
+        }
+      }
       
       var valuesMap = {
         "id": record.id,
@@ -395,7 +420,11 @@ function doPost(e) {
         "type": record.type || "personal",
         "reason": record.reason || "",
         "status": record.status || "pending",
-        "submittedAt": record.submittedAt || new Date().toISOString()
+        "submittedAt": record.submittedAt || new Date().toISOString(),
+        "contactEmail": record.contactEmail || "",
+        "contactLine": record.contactLine || "",
+        "contactPhone": record.contactPhone || "",
+        "evidenceUrl": evidenceUrl || record.evidenceUrl || ""
       };
       
       for (var c = 0; c < headers.length; c++) {
@@ -404,7 +433,44 @@ function doPost(e) {
           leavesSheet.getRange(nextRow, c + 1).setValue(valuesMap[header]);
         }
       }
-      result = { success: true };
+      
+      // Send email notification to teacher if email is provided
+      var teacherEmail = postData.teacherEmail;
+      if (teacherEmail) {
+        var typeMap = {
+          "sick": "ลาป่วย 🤒",
+          "personal": "ลากิจ 💼",
+          "other": "ลาอื่นๆ ✉️"
+        };
+        var typeText = typeMap[record.type] || record.type;
+        var startStr = record.startDate;
+        var endStr = record.endDate;
+        
+        var subject = "แจ้งการลาเรียน: " + record.studentName + " (" + (record.classroom || "") + ")";
+        var body = "แจ้งยื่นใบลาเรียนออนไลน์\n\n" +
+                   "ชื่อนักเรียน: " + record.studentName + "\n" +
+                   "รหัสประจำตัว: " + record.studentId + "\n" +
+                   "ห้องเรียน: " + (record.classroom || "-") + "\n" +
+                   "ประเภทการลา: " + typeText + "\n" +
+                   "ตั้งแต่วันที่: " + startStr + "\n" +
+                   "ถึงวันที่: " + endStr + "\n" +
+                   "เหตุผลการลา: " + record.reason + "\n\n" +
+                   (evidenceUrl ? "ลิงก์เอกสารหลักฐานแนบ: " + evidenceUrl + "\n\n" : "") +
+                   "ข้อมูลติดต่อผู้ปกครอง/นักเรียน:\n" +
+                   "- อีเมล: " + (record.contactEmail || "-") + "\n" +
+                   "- LINE ID: " + (record.contactLine || "-") + "\n" +
+                   "- เบอร์โทรศัพท์: " + (record.contactPhone || "-") + "\n\n" +
+                   "กรุณาเข้าสู่ระบบ Smart Attendance เพื่อตรวจสอบและอนุมัติใบลาครับ\n" +
+                   "ลิงก์ระบบ: " + (postData.systemUrl || "");
+        
+        try {
+          MailApp.sendEmail(teacherEmail, subject, body);
+        } catch (mailError) {
+          console.error("Error sending email via MailApp: " + mailError.toString());
+        }
+      }
+      
+      result = { success: true, evidenceUrl: evidenceUrl };
       
     } else if (action === "updateLeaveStatus") {
       var id = postData.id;

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import HomeCardLink from "@/components/HomeCardLink";
 import { getSettings } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -135,8 +136,9 @@ export default async function Home() {
           </Link>
 
           {/* Card 3: Dashboard Summary */}
-          <Link
+          <HomeCardLink
             href="/dashboard"
+            requireAuth={true}
             className="group relative flex flex-col justify-between rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm hover:shadow-md hover:border-purple-200 dark:hover:border-purple-800/80 transition-all duration-300 hover:-translate-y-1"
           >
             <div>
@@ -177,7 +179,7 @@ export default async function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
               </svg>
             </div>
-          </Link>
+          </HomeCardLink>
         </div>
       </div>
 
@@ -192,8 +194,9 @@ export default async function Home() {
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {/* Card 4: Register Student */}
-          <Link
+          <HomeCardLink
             href="/register"
+            requireAuth={true}
             className="group relative flex flex-col justify-between rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-800/80 transition-all duration-300 hover:-translate-y-1"
           >
             <div>
@@ -234,11 +237,12 @@ export default async function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
               </svg>
             </div>
-          </Link>
+          </HomeCardLink>
 
           {/* Card 5: Manage Students (CRUD & Print) */}
-          <Link
+          <HomeCardLink
             href="/students"
+            requireAuth={true}
             className="group relative flex flex-col justify-between rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm hover:shadow-md hover:border-amber-200 dark:hover:border-amber-800/80 transition-all duration-300 hover:-translate-y-1"
           >
             <div>
@@ -279,11 +283,12 @@ export default async function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
               </svg>
             </div>
-          </Link>
+          </HomeCardLink>
 
           {/* Card 6: Settings */}
-          <Link
+          <HomeCardLink
             href="/settings"
+            requireAdmin={true}
             className="group relative flex flex-col justify-between rounded-2xl border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-sm hover:shadow-md hover:border-rose-200 dark:hover:border-rose-800/80 transition-all duration-300 hover:-translate-y-1"
           >
             <div>
@@ -322,7 +327,7 @@ export default async function Home() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
               </svg>
             </div>
-          </Link>
+          </HomeCardLink>
         </div>
       </div>
 

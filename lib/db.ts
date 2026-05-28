@@ -1002,14 +1002,20 @@ export async function getLeaveRequests(): Promise<LeaveRequest[]> {
 }
 
 // Save leave request (Submit)
-export async function saveLeaveRequest(request: LeaveRequest): Promise<boolean> {
+export async function saveLeaveRequest(request: LeaveRequest, teacherEmail?: string, systemUrl?: string): Promise<boolean> {
   // 1. Try Google Sheets if active
   if (isGoogleSheetsActive()) {
     try {
-      const res = await callGoogleScript('addLeave', { record: request });
+      const res = await callGoogleScript('addLeave', { record: request, teacherEmail, systemUrl });
       if (res && res.success) {
         // Cache locally
         try {
+          if (res.evidenceUrl) {
+            request.evidenceUrl = res.evidenceUrl;
+          }
+          // Remove large base64 data to save disk space
+          delete request.evidenceBase64;
+
           await ensureDbExists();
           const data = await fs.readFile(LEAVES_FILE, 'utf-8');
           const parsed = JSON.parse(data);
@@ -1027,6 +1033,9 @@ export async function saveLeaveRequest(request: LeaveRequest): Promise<boolean> 
   // 2. Local fallback
   const release = await dbMutex.acquire();
   try {
+    // Remove base64 data before saving locally
+    delete request.evidenceBase64;
+
     await ensureDbExists();
     const data = await fs.readFile(LEAVES_FILE, 'utf-8');
     const parsed = JSON.parse(data);

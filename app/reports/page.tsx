@@ -207,9 +207,11 @@ export default function ReportsPage() {
     });
 
     const totalDays = presentCount + lateCount + absentCount + leaveCount;
-    // Attendance rate = (Present + Late) / Total Tracked Days
-    const attendanceRate = totalDays > 0 
-      ? Math.round(((presentCount + lateCount) / totalDays) * 100)
+    // Excused leaves from the denominator so they do not lower the attendance rate
+    const denominator = totalDays - leaveCount;
+    // Attendance rate = (Present + Late) / (Total Tracked Days - Leaves)
+    const attendanceRate = denominator > 0 
+      ? Math.round(((presentCount + lateCount) / denominator) * 100)
       : 100; // default to 100 if no logs recorded
 
     return {
@@ -1014,6 +1016,7 @@ export default function ReportsPage() {
                     <th className="py-3 px-2 w-[90px]">ประเภทการลา</th>
                     <th className="py-3 px-2 w-[180px]">วันที่ลา</th>
                     <th className="py-3 px-2">เหตุผลการลา</th>
+                    <th className="py-3 px-2 w-[180px]">ข้อมูลติดต่อ / หลักฐาน</th>
                     <th className="py-3 px-2 w-[100px] text-center">สถานะ</th>
                     <th className="py-3 px-2 w-[150px] text-center">การดำเนินการ</th>
                   </tr>
@@ -1047,6 +1050,24 @@ export default function ReportsPage() {
                           </td>
                           <td className="py-3 px-2 text-slate-600 max-w-[250px] truncate" title={leave.reason}>
                             {leave.reason}
+                          </td>
+                          <td className="py-3 px-2 text-slate-600 text-[10px] leading-relaxed">
+                            <div className="flex flex-col gap-0.5">
+                              {leave.contactEmail && <div className="truncate">📧 {leave.contactEmail}</div>}
+                              {leave.contactLine && <div className="truncate">💬 LINE: {leave.contactLine}</div>}
+                              {leave.contactPhone && <div className="truncate">📞 {leave.contactPhone}</div>}
+                              {leave.evidenceUrl && (
+                                <a 
+                                  href={leave.evidenceUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline font-bold mt-1.5 flex items-center gap-0.5"
+                                >
+                                  📎 ดูเอกสารหลักฐาน
+                                </a>
+                              )}
+                              {!leave.contactEmail && !leave.contactLine && !leave.contactPhone && !leave.evidenceUrl && <span>-</span>}
+                            </div>
                           </td>
                           <td className="py-3 px-2 text-center">
                             <span className={`rounded-lg px-2.5 py-0.5 font-bold ${
@@ -1086,7 +1107,7 @@ export default function ReportsPage() {
                     })
                   ) : (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-400">
+                      <td colSpan={9} className="py-12 text-center text-slate-400">
                         ไม่พบคำร้องขอลาเรียนตามเงื่อนไขที่เลือก
                       </td>
                     </tr>
