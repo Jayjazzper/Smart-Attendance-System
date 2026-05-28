@@ -1,12 +1,23 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { Student, Attendance, LeaveRequest, Teacher } from './types';
+import { createClient } from '@supabase/supabase-js';
 
 // Paths to JSON files
 const DATA_DIR = path.join(process.cwd(), 'data');
 const STUDENTS_FILE = path.join(DATA_DIR, 'students.json');
 const ATTENDANCE_FILE = path.join(DATA_DIR, 'attendance.json');
 const LEAVES_FILE = path.join(DATA_DIR, 'leaves.json');
+
+// Supabase Configuration
+const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+export function isSupabaseActive(): boolean {
+  return !!SUPABASE_URL && !!SUPABASE_KEY;
+}
+
+const supabase = isSupabaseActive() ? createClient(SUPABASE_URL!, SUPABASE_KEY!) : null;
 
 // Google Apps Script URL from environment variables
 const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL || process.env.NEXT_PUBLIC_GOOGLE_SCRIPT_URL;
@@ -90,6 +101,21 @@ const dbMutex = new Mutex();
 
 // Get all students
 export async function getStudents(): Promise<Student[]> {
+  if (isSupabaseActive() && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('students')
+        .select('*');
+      if (error) throw error;
+      return (data || []).map(s => ({
+        ...s,
+        faceDescriptor: s.faceDescriptor ? (typeof s.faceDescriptor === 'string' ? JSON.parse(s.faceDescriptor) : s.faceDescriptor) : []
+      }));
+    } catch (e) {
+      console.error('Supabase getStudents error:', e);
+    }
+  }
+
   // 1. Try Google Sheets Web App if active
   if (isGoogleSheetsActive()) {
     try {
@@ -124,6 +150,22 @@ export async function getStudents(): Promise<Student[]> {
 
 // Save a student (Register)
 export async function saveStudent(student: Student): Promise<boolean> {
+  if (isSupabaseActive() && supabase) {
+    try {
+      const { error } = await supabase
+        .from('students')
+        .insert([{
+          ...student,
+          faceDescriptor: student.faceDescriptor
+        }]);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.error('Supabase saveStudent error:', e);
+      return false;
+    }
+  }
+
   // 1. Try Google Sheets Web App if active
   if (isGoogleSheetsActive()) {
     try {
@@ -161,6 +203,30 @@ export async function saveStudent(student: Student): Promise<boolean> {
 }
 
 export async function saveAllStudents(students: Student[]): Promise<boolean> {
+  if (isSupabaseActive() && supabase) {
+    try {
+      const { error: deleteError } = await supabase
+        .from('students')
+        .delete()
+        .neq('id', 'placeholder');
+      if (deleteError) throw deleteError;
+
+      if (students.length > 0) {
+        const { error: insertError } = await supabase
+          .from('students')
+          .insert(students.map(s => ({
+            ...s,
+            faceDescriptor: s.faceDescriptor
+          })));
+        if (insertError) throw insertError;
+      }
+      return true;
+    } catch (e) {
+      console.error('Supabase saveAllStudents error:', e);
+      return false;
+    }
+  }
+
   const release = await dbMutex.acquire();
   try {
     await ensureDbExists();
@@ -187,6 +253,43 @@ export async function updateStudent(
   emergencyPhone?: string,
   medicalAlert?: string
 ): Promise<boolean> {
+  if (isSupabaseActive() && supabase) {
+    try {
+      const updateData: any = {};
+      if (name !== undefined) updateData.name = name;
+      if (email !== undefined) updateData.email = email;
+      if (classroom !== undefined) updateData.classroom = classroom;
+      if (level !== undefined) updateData.level = level;
+      if (parentLineId !== undefined) updateData.parentLineId = parentLineId;
+      if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
+      if (bloodGroup !== undefined) updateData.bloodGroup = bloodGroup;
+      if (emergencyPhone !== undefined) updateData.emergencyPhone = emergencyPhone;
+      if (medicalAlert !== undefined) updateData.medicalAlert = medicalAlert;
+
+      const { error } = await supabase
+        .from('students')
+        .update(updateData)
+        .eq('id', id);
+      if (error) throw error;
+
+      // Update matching logs in attendance too
+      const { error: attError } = await supabase
+        .from('attendance')
+        .update({
+          studentName: name,
+          studentEmail: email,
+          ...(classroom !== undefined ? { classroom } : {})
+        })
+        .eq('studentId', id);
+      if (attError) console.error('Supabase updateStudent attendance sync error:', attError);
+
+      return true;
+    } catch (e) {
+      console.error('Supabase updateStudent error:', e);
+      return false;
+    }
+  }
+
   // 1. Try Google Sheets Web App if active
   if (isGoogleSheetsActive()) {
     try {
@@ -254,6 +357,33 @@ export async function updateStudent(
 
 // Delete student and their attendance records (Right to be Forgotten)
 export async function deleteStudent(id: string): Promise<boolean> {
+  if (isSupabaseActive() && supabase) {
+    try {
+      const { error: studentError } = await supabase
+        .from('students')
+        .delete()
+        .eq('id', id);
+      if (studentError) throw studentError;
+
+      const { error: attError } = await supabase
+        .from('attendance')
+        .delete()
+        .eq('studentId', id);
+      if (attError) throw attError;
+
+      const { error: leaveError } = await supabase
+        .from('leaves')
+        .delete()
+        .eq('studentId', id);
+      if (leaveError) throw leaveError;
+
+      return true;
+    } catch (e) {
+      console.error('Supabase deleteStudent error:', e);
+      return false;
+    }
+  }
+
   // 1. Try Google Sheets Web App if active
   if (isGoogleSheetsActive()) {
     try {
@@ -300,6 +430,22 @@ export async function deleteStudent(id: string): Promise<boolean> {
 
 // Get all attendance
 export async function getAttendance(): Promise<Attendance[]> {
+  if (isSupabaseActive() && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('*');
+      if (error) throw error;
+      return (data || []).map(a => ({
+        ...a,
+        confidence: a.confidence ? parseFloat(a.confidence) : 100,
+        temperature: a.temperature ? parseFloat(a.temperature) : undefined
+      }));
+    } catch (e) {
+      console.error('Supabase getAttendance error:', e);
+    }
+  }
+
   // 1. Try Google Sheets Web App if active
   if (isGoogleSheetsActive()) {
     try {
@@ -337,6 +483,24 @@ export async function saveAttendance(
 ): Promise<Attendance | null> {
   const finalTimestamp = record.timestamp || new Date().toISOString();
   
+  if (isSupabaseActive() && supabase) {
+    try {
+      const newRecord: Attendance = {
+        ...record,
+        id: globalThis.crypto?.randomUUID() || Math.random().toString(36).substring(2, 11),
+        timestamp: finalTimestamp
+      };
+      const { error } = await supabase
+        .from('attendance')
+        .insert([newRecord]);
+      if (error) throw error;
+      return newRecord;
+    } catch (e) {
+      console.error('Supabase saveAttendance error:', e);
+      return null;
+    }
+  }
+
   // 1. Try Google Sheets Web App if active
   if (isGoogleSheetsActive()) {
     try {
@@ -381,6 +545,20 @@ export async function saveAttendance(
 
 // Reset Database (Delete everything)
 export async function resetDatabase(): Promise<boolean> {
+  if (isSupabaseActive() && supabase) {
+    try {
+      await supabase.from('students').delete().neq('id', 'placeholder');
+      await supabase.from('attendance').delete().neq('id', 'placeholder');
+      await supabase.from('leaves').delete().neq('id', 'placeholder');
+      // Re-seed mock data
+      await seedMockData();
+      return true;
+    } catch (e) {
+      console.error('Supabase resetDatabase error:', e);
+      return false;
+    }
+  }
+
   // 1. Try Google Sheets Web App if active
   if (isGoogleSheetsActive()) {
     try {
@@ -783,6 +961,45 @@ function ensureDefaultAdmin(settings: SystemSettings): { settings: SystemSetting
 }
 
 export async function getSettings(): Promise<SystemSettings> {
+  if (isSupabaseActive() && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('*')
+        .eq('key', 'system');
+      
+      let rawSettings: SystemSettings | null = null;
+      if (data && data.length > 0) {
+        const value = data[0].value;
+        rawSettings = typeof value === 'string' ? JSON.parse(value) : value;
+      }
+      
+      if (!rawSettings) {
+        rawSettings = {
+          classrooms: {},
+          lineChannelAccessToken: "",
+          teacherPasscode: "1234",
+          adminPasscode: "1234",
+          schoolName: process.env.NEXT_PUBLIC_SCHOOL_NAME || "โรงเรียนบ้านป่าเลา(ประชานุสรณ์)",
+          schoolDistrict: process.env.NEXT_PUBLIC_SCHOOL_DISTRICT || "สังกัดสำนักงานเขตพื้นที่การศึกษาประถมศึกษาแพร่ เขต 1",
+          schoolLogo: "",
+          enableAutoSummary: false,
+          summaryTime: "08:30",
+          lastSummarySentDate: {},
+          teachers: []
+        };
+      }
+      
+      const { settings: finalSettings, changed } = ensureDefaultAdmin(rawSettings);
+      if (changed) {
+        await saveSettings(finalSettings);
+      }
+      return finalSettings;
+    } catch (e) {
+      console.error('Supabase getSettings error:', e);
+    }
+  }
+
   let rawSettings: SystemSettings | null = null;
   let isFallback = false;
   
@@ -879,6 +1096,19 @@ export async function getSettings(): Promise<SystemSettings> {
 }
 
 export async function saveSettings(settings: SystemSettings): Promise<boolean> {
+  if (isSupabaseActive() && supabase) {
+    try {
+      const { error } = await supabase
+        .from('settings')
+        .upsert([{ key: 'system', value: settings }]);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.error('Supabase saveSettings error:', e);
+      return false;
+    }
+  }
+
   // 1. Try Google Sheets Web App if active
   if (isGoogleSheetsActive()) {
     try {
@@ -969,6 +1199,18 @@ export async function deleteTeacher(username: string): Promise<boolean> {
 
 // Get all leave requests
 export async function getLeaveRequests(): Promise<LeaveRequest[]> {
+  if (isSupabaseActive() && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('leaves')
+        .select('*');
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      console.error('Supabase getLeaveRequests error:', e);
+    }
+  }
+
   // 1. Try Google Sheets if active
   if (isGoogleSheetsActive()) {
     try {
@@ -1003,6 +1245,22 @@ export async function getLeaveRequests(): Promise<LeaveRequest[]> {
 
 // Save leave request (Submit)
 export async function saveLeaveRequest(request: LeaveRequest, teacherEmail?: string, systemUrl?: string): Promise<boolean> {
+  if (isSupabaseActive() && supabase) {
+    try {
+      const uploadReq = { ...request };
+      delete uploadReq.evidenceBase64;
+      
+      const { error } = await supabase
+        .from('leaves')
+        .insert([uploadReq]);
+      if (error) throw error;
+      return true;
+    } catch (e) {
+      console.error('Supabase saveLeaveRequest error:', e);
+      return false;
+    }
+  }
+
   // 1. Try Google Sheets if active
   if (isGoogleSheetsActive()) {
     try {
@@ -1056,6 +1314,63 @@ export async function updateLeaveRequestStatus(
   id: string,
   status: 'approved' | 'rejected'
 ): Promise<boolean> {
+  if (isSupabaseActive() && supabase) {
+    try {
+      const { error } = await supabase
+        .from('leaves')
+        .update({ status })
+        .eq('id', id);
+      if (error) throw error;
+
+      if (status === 'approved') {
+        const { data, error: fetchErr } = await supabase
+          .from('leaves')
+          .select('*')
+          .eq('id', id);
+        
+        if (data && data.length > 0) {
+          const req = data[0];
+          const start = new Date(req.startDate);
+          const end = new Date(req.endDate);
+          
+          let current = new Date(start);
+          const attendanceLogs: Attendance[] = [];
+          while (current <= end) {
+            const logTimestamp = new Date(
+              current.getFullYear(),
+              current.getMonth(),
+              current.getDate(),
+              8, 30, 0
+            ).toISOString();
+
+            attendanceLogs.push({
+              id: globalThis.crypto?.randomUUID() || Math.random().toString(36).substring(2, 11),
+              studentId: req.studentId,
+              studentName: req.studentName,
+              studentEmail: "",
+              confidence: 100,
+              timestamp: logTimestamp,
+              classroom: req.classroom,
+              status: 'leave'
+            });
+            current.setDate(current.getDate() + 1);
+          }
+          
+          if (attendanceLogs.length > 0) {
+            const { error: insertErr } = await supabase
+              .from('attendance')
+              .insert(attendanceLogs);
+            if (insertErr) throw insertErr;
+          }
+        }
+      }
+      return true;
+    } catch (e) {
+      console.error('Supabase updateLeaveRequestStatus error:', e);
+      return false;
+    }
+  }
+
   let remoteLeaves: LeaveRequest[] | null = null;
 
   // 1. Try Google Sheets if active
