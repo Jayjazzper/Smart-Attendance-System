@@ -1247,9 +1247,37 @@ export async function getLeaveRequests(): Promise<LeaveRequest[]> {
 export async function saveLeaveRequest(request: LeaveRequest, teacherEmail?: string, systemUrl?: string): Promise<boolean> {
   if (isSupabaseActive() && supabase) {
     try {
-      const uploadReq = { ...request };
+      let evidenceUrl = request.evidenceUrl || "";
+
+      // If there is base64 file data, upload it to Supabase Storage (requires a bucket named "evidence" to be public)
+      if (request.evidenceBase64 && request.evidenceName && request.evidenceMimeType) {
+        try {
+          const fileBuffer = Buffer.from(request.evidenceBase64, 'base64');
+          const fileName = `${Date.now()}_${request.evidenceName}`;
+
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('evidence')
+            .upload(fileName, fileBuffer, {
+              contentType: request.evidenceMimeType,
+              upsert: true
+            });
+
+          if (uploadError) throw uploadError;
+
+          // Get public URL
+          const { data: urlData } = supabase.storage
+            .from('evidence')
+            .getPublicUrl(fileName);
+
+          evidenceUrl = urlData.publicUrl;
+        } catch (storageErr) {
+          console.error('Supabase Storage upload failed, using fallback:', storageErr);
+        }
+      }
+
+      const uploadReq = { ...request, evidenceUrl };
       delete uploadReq.evidenceBase64;
-      
+
       const { error } = await supabase
         .from('leaves')
         .insert([uploadReq]);
