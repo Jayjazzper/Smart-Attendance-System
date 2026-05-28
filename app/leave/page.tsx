@@ -47,6 +47,7 @@ export default function LeavePage() {
   const [evidenceName, setEvidenceName] = useState("");
   const [evidenceMimeType, setEvidenceMimeType] = useState("");
   const [fileError, setFileError] = useState("");
+  const [fileLoading, setFileLoading] = useState(false);
   
   // Verification states
   const [verifiedStudent, setVerifiedStudent] = useState<Student | null>(null);
@@ -89,12 +90,18 @@ export default function LeavePage() {
     setEvidenceFile(file);
     setEvidenceName(file.name);
     setEvidenceMimeType(file.type);
+    setFileLoading(true);
 
     // Convert to base64
     const reader = new FileReader();
     reader.onload = (event) => {
       const base64String = (event.target?.result as string).split(",")[1];
       setEvidenceBase64(base64String);
+      setFileLoading(false);
+    };
+    reader.onerror = () => {
+      setFileError("เกิดข้อผิดพลาดในการอ่านไฟล์");
+      setFileLoading(false);
     };
     reader.readAsDataURL(file);
   };
@@ -105,6 +112,7 @@ export default function LeavePage() {
     setEvidenceName("");
     setEvidenceMimeType("");
     setFileError("");
+    setFileLoading(false);
   };
 
   // 1. Verify Student ID exists
@@ -166,6 +174,23 @@ export default function LeavePage() {
   const handleSubmitLeave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!verifiedStudent || !startDate || !endDate || !leaveType || !reason.trim()) return;
+
+    // Check if end date is before start date
+    if (new Date(endDate) < new Date(startDate)) {
+      setSubmitMessage({ text: "วันที่สิ้นสุดการลาต้องไม่เกิดก่อนวันที่เริ่มต้นการลา", type: "error" });
+      return;
+    }
+
+    // Check if email format is valid (if provided)
+    if (contactEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail.trim())) {
+      setSubmitMessage({ text: "รูปแบบอีเมลผู้ปกครองไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง", type: "error" });
+      return;
+    }
+
+    if (fileLoading) {
+      setSubmitMessage({ text: "กรุณารอให้อัปโหลดไฟล์หลักฐานเสร็จสิ้นก่อนส่งใบลา", type: "error" });
+      return;
+    }
 
     setIsSubmitting(true);
     setSubmitMessage({ text: "", type: "" });
@@ -436,10 +461,10 @@ export default function LeavePage() {
 
               <button
                 type="submit"
-                disabled={isSubmitting || !reason.trim()}
+                disabled={isSubmitting || fileLoading || !reason.trim()}
                 className="w-full rounded-xl bg-blue-600 py-2.5 text-xs font-bold text-white shadow-sm shadow-blue-500/20 hover:bg-blue-700 disabled:bg-slate-300 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
               >
-                {isSubmitting ? "กำลังส่งใบลา..." : "ส่งใบลาเรียน"}
+                {isSubmitting ? "กำลังส่งใบลา..." : fileLoading ? "กำลังประมวลผลไฟล์แนบ..." : "ส่งใบลาเรียน"}
               </button>
             </form>
           )}
